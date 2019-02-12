@@ -819,13 +819,26 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 {
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
-	u64 last_freq_update_time = sg_policy->last_freq_update_time;
 	unsigned long util = 0, max = 1;
 	unsigned int j;
 
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
 		unsigned long j_util, j_max;
+		s64 delta_ns;
+
+		/*
+		 * If the CPU utilization was last updated before the previous
+		 * frequency update and the time elapsed between the last update
+		 * of the CPU utilization and the last frequency update is long
+		 * enough, don't take the CPU into account as it probably is
+		 * idle now (and clear iowait_boost for it).
+		 */
+		delta_ns = time - j_sg_cpu->last_update;
+		if (delta_ns > stale_ns) {
+			sugov_iowait_reset(j_sg_cpu, time, false);
+			continue;
+		}
 
 		/*
 		 * If the util value for all CPUs in a policy is 0, just using >
