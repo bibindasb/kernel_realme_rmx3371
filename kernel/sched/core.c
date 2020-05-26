@@ -1365,7 +1365,7 @@ static void __setscheduler_uclamp(struct task_struct *p,
 		/* By default, RT tasks always get 100% boost */
 		if (sched_feat(SUGOV_RT_MAX_FREQ) &&
 			       unlikely(rt_task(p) &&
-			       clamp_id == UCLAMP_MIN)) 
+			       clamp_id == UCLAMP_MIN))
 			value = sysctl_sched_uclamp_util_min_rt_default;
 		else
 			value = uclamp_none(clamp_id);
@@ -2614,12 +2614,20 @@ static int ttwu_remote(struct task_struct *p, int wake_flags)
 void sched_ttwu_pending(void)
 {
 	struct rq *rq = this_rq();
-	struct llist_node *llist = llist_del_all(&rq->wake_list);
+	struct llist_node *llist;
 	struct task_struct *p, *t;
 	struct rq_flags rf;
 
+	llist = llist_del_all(&rq->wake_list);
 	if (!llist)
 		return;
+
+	/*
+	 * rq::ttwu_pending racy indication of out-standing wakeups.
+	 * Races such that false-negatives are possible, since they
+	 * are shorter lived that false-positives would be.
+	 */
+	WRITE_ONCE(rq->ttwu_pending, 0);
 
 	rq_lock_irqsave(rq, &rf);
 	update_rq_clock(rq);
@@ -2698,6 +2706,7 @@ static void __ttwu_queue_wakelist(struct task_struct *p, int cpu, int wake_flags
 
 	p->sched_remote_wakeup = !!(wake_flags & WF_MIGRATED);
 
+	WRITE_ONCE(rq->ttwu_pending, 1);
 	if (llist_add(&p->wake_entry, &cpu_rq(cpu)->wake_list)) {
 		if (!set_nr_if_polling(rq->idle))
 			smp_send_reschedule(cpu);
@@ -5201,7 +5210,8 @@ int idle_cpu(int cpu)
 		return 0;
 
 #ifdef CONFIG_SMP
-	if (!llist_empty(&rq->wake_list))
+#if SCHED_FEAT_TTWU_QUEUE
+	if (rq->ttwu_pending)
 		return 0;
 #endif
 
