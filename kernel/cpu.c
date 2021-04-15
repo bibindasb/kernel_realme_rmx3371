@@ -2386,9 +2386,6 @@ const struct cpumask *const cpu_prime_mask = cpu_possible_mask;
 #endif
 EXPORT_SYMBOL(cpu_prime_mask);
 
-unsigned int __cpu_psci_id[NR_CPUS];
-EXPORT_SYMBOL(__cpu_psci_id);
-
 void init_cpu_present(const struct cpumask *src)
 {
 	cpumask_copy(&__cpu_present_mask, src);
