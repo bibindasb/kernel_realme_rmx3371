@@ -8424,8 +8424,6 @@ static int find_energy_efficient_cpu(struct task_struct *p, int prev_cpu,
 		}
 	}
 unlock:
-	rcu_read_unlock();
-
 	/*
 	 * Pick the prev CPU, if best energy CPU can't saves at least 6% of
 	 * the energy used by prev_cpu.
@@ -8436,25 +8434,7 @@ unlock:
 	    ((prev_energy - best_energy) <= prev_energy >> 4))
 		best_energy_cpu = prev_cpu;
 
-#if defined(OPLUS_FEATURE_SCHED_ASSIST) && defined(CONFIG_OPLUS_FEATURE_SCHED_SPREAD)
-oplus_done:
-#endif
-
-#ifdef OPLUS_FEATURE_SCHED_ASSIST
-	if (!fbt_env.fastpath)
-		set_ux_task_to_prefer_cpu(p, &best_energy_cpu);
-#endif /* OPLUS_FEATURE_SCHED_ASSIST */
-#ifdef OPLUS_FEATURE_SCHED_ASSIST
-	if (sched_assist_scene(SA_SLIDE) && is_heavy_ux_task(p) &&
-		ux_task_misfit(p, best_energy_cpu)) {
-		find_ux_task_cpu(p, &best_energy_cpu);
-	}
-#endif /* OPLUS_FEATURE_SCHED_ASSIST */
-
-#ifdef CONFIG_OPLUS_FEATURE_TPP
-	if (tpp_task(p))
-		tpp_find_cpu(&best_energy_cpu, p);
-#endif /* CONFIG_OPLUS_FEATURE_TPP */
+	rcu_read_unlock();
 
 done:
 
