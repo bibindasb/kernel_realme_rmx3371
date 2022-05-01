@@ -18,8 +18,8 @@
 #include <linux/sched/sysctl.h>
 #include <linux/kprofiles.h>
 
-static unsigned int default_efficient_freq_lp[] = {0};
-static u64 default_up_delay_lp[] = {0};
+static unsigned int default_efficient_freq_lp[] = {1708800};
+static u64 default_up_delay_lp[] = {100 * NSEC_PER_MSEC};
 
 static unsigned int default_efficient_freq_hp[] = {1766400};
 static u64 default_up_delay_hp[] = {100 * NSEC_PER_MSEC};
