@@ -16,7 +16,6 @@
 #include <linux/sched/cpufreq.h>
 #include <trace/events/power.h>
 #include <linux/sched/sysctl.h>
-#include <linux/kprofiles.h>
 
 static unsigned int default_efficient_freq_lp[] = {1708800};
 static u64 default_up_delay_lp[] = {100 * NSEC_PER_MSEC};
@@ -195,7 +194,7 @@ static inline void do_freq_limit(struct sugov_policy *sg_policy, unsigned int *f
 	if (active_mode() != 3)
 		return;
 #endif
-	
+
 	if (*freq > sg_policy->tunables->efficient_freq[sg_policy->tunables->current_step] && !sg_policy->first_hp_request_time) {
 		/* First request */
 		*freq = sg_policy->tunables->efficient_freq[sg_policy->tunables->current_step];
@@ -205,7 +204,7 @@ static inline void do_freq_limit(struct sugov_policy *sg_policy, unsigned int *f
 		/* Goto a lower one */
 		sg_policy->tunables->current_step = match_nearest_efficient_step(*freq, sg_policy->tunables->nefficient_freq, sg_policy->tunables->efficient_freq);
 		sg_policy->first_hp_request_time = 0;
-	} else if ((sg_policy->first_hp_request_time 
+	} else if ((sg_policy->first_hp_request_time
 		&& time < sg_policy->first_hp_request_time + sg_policy->tunables->up_delay[sg_policy->tunables->current_step])){
 		/* Restrict it */
 		*freq = sg_policy->tunables->efficient_freq[sg_policy->tunables->current_step];
@@ -449,7 +448,7 @@ unsigned long schedhorizon_cpu_util(int cpu, unsigned long util_cfs,
 	util = util_cfs + cpu_util_rt(rq);
 	if (type == FREQUENCY_UTIL)
 		util = uclamp_rq_util_with(rq, util, p);
-	
+
 	dl_util = cpu_util_dl(rq);
 
 	/*
@@ -514,7 +513,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 {
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	
+
 	unsigned long util_cfs = cpu_util_cfs(rq);
 	unsigned long max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
 
@@ -833,7 +832,7 @@ static u64 *resolve_data_delay (const char *buf, int *num_ret,size_t count)
 		num++;
 
 	output = kzalloc(num * sizeof(u64), GFP_KERNEL);
-	
+
 	cp = buf;
 	i = 0;
 	pr_err("Before while");
@@ -1323,7 +1322,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 
 	tunables->up_rate_limit_us = cpufreq_policy_transition_delay_us(policy);
 	tunables->down_rate_limit_us = cpufreq_policy_transition_delay_us(policy);
-	
+
 	if (cpumask_test_cpu(sg_policy->policy->cpu, cpu_lp_mask)) {
 		tunables->efficient_freq = default_efficient_freq_lp;
     		tunables->nefficient_freq = ARRAY_SIZE(default_efficient_freq_lp);
