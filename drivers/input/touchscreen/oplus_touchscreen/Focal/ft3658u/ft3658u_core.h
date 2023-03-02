@@ -249,6 +249,8 @@ struct fts_ts_data {
     struct fts_autotest_offset *fts_autotest_offset;
     struct touchpanel_data *ts;
     struct monitor_data_v2 *monitor_data_v2;
+	int gesture_state;
+    bool black_gesture_indep;
     bool high_resolution_support;
 	bool high_resolution_support_x8;
 };

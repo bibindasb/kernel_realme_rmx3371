@@ -944,16 +944,48 @@ static void fts_main_register_read(struct seq_file *s, void *chip_data)
     return;
 }
 
+#define SET_FTS_GESTURE(state, state_flag, config, config_flag)\
+    if (CHK_BIT(state, (1 << state_flag))) {\
+        SET_BIT(config, (1 << config_flag));\
+    } else {\
+        CLR_BIT(config, (1 << config_flag));\
+    }
+
 static int fts_enable_black_gesture(struct fts_ts_data *ts_data, bool enable)
 {
     int i = 0;
     int ret = 0;
-    int config1 = 0xff;
-    int config2 = 0xff;
-    int config4 = 0xff;
+    int state = ts_data->gesture_state;
 
+    int config1 = 0x50;
+    int config2 = 0xf8;
+    int config4 = 0xc1;
+    if (ts_data->black_gesture_indep) {
+        if (enable) {
+            SET_FTS_GESTURE(state, Right2LeftSwip, config1, 0)
+            SET_FTS_GESTURE(state, Left2RightSwip, config1, 1)
+            SET_FTS_GESTURE(state, Down2UpSwip, config1, 2)
+            SET_FTS_GESTURE(state, Up2DownSwip, config1, 3)
+            SET_FTS_GESTURE(state, DouTap, config1, 4)
+            SET_FTS_GESTURE(state, DouSwip, config1, 5)
+            SET_FTS_GESTURE(state, Circle, config2, 0)
+            SET_FTS_GESTURE(state, Wgestrue, config2, 1)
+            SET_FTS_GESTURE(state, Mgestrue, config2, 2)
+            SET_FTS_GESTURE(state, RightVee, config4, 1)
+            SET_FTS_GESTURE(state, LeftVee, config4, 2)
+            SET_FTS_GESTURE(state, DownVee, config4, 3)
+            SET_FTS_GESTURE(state, UpVee, config4, 4)
+        } else {
+            config1 = 0;
+            config2 = 0;
+            config4 = 0;
+        }
+    }
     TPD_INFO("MODE_GESTURE, write 0xD0=%d", enable);
 
+    TPD_INFO("MODE_GESTURE, config1=%x", config1);
+    TPD_INFO("MODE_GESTURE, config2=%x", config2);
+    TPD_INFO("MODE_GESTURE, config4=%x", config4);
     if (enable) {
         for (i = 0; i < 5 ; i++) {
             ret = touch_i2c_write_byte(ts_data->client, FTS_REG_GESTURE_CONFIG1, config1);
@@ -1585,6 +1617,10 @@ static int fts_get_gesture_info(void *chip_data, struct gesture_info *gesture)
         gesture->Point_4th.y = (u16)((buf[26] << 8) + buf[27]);
     }
 
+	if (gesture != NULL) {
+	//fts_hw_reset(ts_data, RESET_TO_NORMAL_TIME);
+	}
+
     return 0;
 }
 
@@ -1704,6 +1740,13 @@ static int fts_refresh_switch(void *chip_data, int fps)
 
     return touch_i2c_write_byte(ts_data->client, FTS_REG_REPORT_RATE,
                                 fps == 60 ? FTS_120HZ_REPORT_RATE : FTS_180HZ_REPORT_RATE);
+}
+
+static void fts_set_gesture_state(void *chip_data, int state)
+{
+    struct fts_ts_data *ts_data = (struct fts_ts_data *)chip_data;
+
+    ts_data->gesture_state = state;
 }
 
 static int fts_smooth_lv_set(void *chip_data, int level)
