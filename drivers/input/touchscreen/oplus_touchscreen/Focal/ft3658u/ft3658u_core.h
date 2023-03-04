@@ -253,6 +253,7 @@ struct fts_ts_data {
     struct monitor_data_v2 *monitor_data_v2;
     bool high_resolution_support;
 	bool high_resolution_support_x8;
+	bool leave_gesture_buffer;
 };
 
 
