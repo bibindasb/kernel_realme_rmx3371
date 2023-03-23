@@ -6922,6 +6922,7 @@ static int nvt_tp_remove(struct spi_device *client)
 	return 0;
 }
 
+#if 0
 static int nvt_spi_suspend(struct device *dev)
 {
 	struct touchpanel_data *ts = dev_get_drvdata(dev);
@@ -6943,6 +6944,7 @@ static int nvt_spi_resume(struct device *dev)
 
 	return 0;
 }
+#endif
 
 static const struct spi_device_id tp_id[] = {
 #ifdef CONFIG_TOUCHPANEL_MULTI_NOFLASH
