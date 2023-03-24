@@ -326,6 +326,7 @@ struct panel_info {
 	uint32_t    platform_support_project_dir[21];
 	char  *platform_support_commandline[21];
 	char  *platform_support_external_name[21];
+
     int    project_num;
     struct firmware_headfile firmware_headfile;     /*firmware headfile for noflash ic*/
     struct manufacture_info manufacture_info;       /*touchpanel device info*/
