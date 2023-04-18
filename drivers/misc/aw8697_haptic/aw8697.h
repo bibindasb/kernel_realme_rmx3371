@@ -535,12 +535,8 @@ struct aw8697_que_seq {
 #define AW8697_HAPTIC_LOW_LEVEL_REG_VAL     0
 #define AW8697_HAPTIC_MEDIUM_LEVEL_VOL      1600
 #define AW8697_HAPTIC_MEDIUM_LEVEL_REG_VAL  0
-#define AW8697_HAPTIC_HIGH_LEVEL_VOL        2500
-#ifdef CONFIG_OPLUS_HAPTIC_OOS
-#define AW8697_HAPTIC_HIGH_LEVEL_REG_VAL    0x16
-#else
-#define AW8697_HAPTIC_HIGH_LEVEL_REG_VAL    0x18
-#endif
+#define AW8697_HAPTIC_HIGH_LEVEL_VOL        4600
+
 //#define AW8697_HAPTIC_RAM_VBAT_COMP_GAIN  0x80
 
 #define AW8697_WAVEFORM_INDEX_TRADITIONAL_1        1
@@ -624,4 +620,3 @@ enum aw8697_haptic_motor_old_test_mode {
 #endif
 
 #endif
-
