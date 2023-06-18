@@ -120,6 +120,7 @@
 #define UNICODE_DETECT  0x08
 #define STAP_DETECT     0x10
 #define M_UNICODE       0x6d
+#define S_UNICODE       0x73
 #define W_UNICODE       0x77
 
 #define TOUCH_HOLD_DOWN 0x80
