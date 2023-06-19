@@ -3092,6 +3092,9 @@ static int syna_get_gesture_info(void *chip_data, struct gesture_info *gesture)
 	case DTAP_DETECT:
 		gesture->gesture_type = DouTap;
 		break;
+        case STAP_DETECT:
+                gesture->gesture_type = SingleTap;
+                break;
 	case CIRCLE_DETECT:
 		gesture->gesture_type = Circle;
 		if (touch_data->extra_gesture_info[2] == 0x10)
@@ -3121,6 +3124,9 @@ static int syna_get_gesture_info(void *chip_data, struct gesture_info *gesture)
 	case M_UNICODE:
 		gesture->gesture_type = Mgestrue;
 		break;
+        case S_UNICODE:
+                gesture->gesture_type = SGESTRUE;
+                break;
 	case W_UNICODE:
 		gesture->gesture_type = Wgestrue;
 		break;
@@ -3148,9 +3154,6 @@ static int syna_get_gesture_info(void *chip_data, struct gesture_info *gesture)
 		} else if (touch_data->extra_gesture_info[2] == 0x20) {
 				gesture->clockwise = 0;
 		}
-		break;
-	case STAP_DETECT:
-		gesture->gesture_type = SingleTap;
 		break;
 	case TRIANGLE_DETECT:
 	default:

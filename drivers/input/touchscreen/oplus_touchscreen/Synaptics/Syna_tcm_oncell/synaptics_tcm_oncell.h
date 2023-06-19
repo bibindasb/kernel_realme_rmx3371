@@ -119,6 +119,7 @@
 #define HEART_DETECT    0x07
 #define UNICODE_DETECT  0x08
 #define STAP_DETECT     0x10
+#define S_UNICODE       0x73
 #define M_UNICODE       0x6d
 #define W_UNICODE       0x77
 
