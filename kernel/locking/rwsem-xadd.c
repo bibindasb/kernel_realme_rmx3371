@@ -21,6 +21,13 @@
 
 #include "rwsem.h"
 
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+#include <linux/sched/clock.h>
+#include <linux/mm.h>
+#include <linux/sched.h>
+extern u64 sysctl_mmapsem_uninterruptable_time;
+#endif
 /*
  * Guide to the rw_semaphore's count field for common values.
  * (32-bit case illustrated, similar for 64-bit)
@@ -90,20 +97,15 @@ void __init_rwsem(struct rw_semaphore *sem, const char *name,
 	sem->owner = NULL;
 	osq_lock_init(&sem->osq);
 #endif
+#ifdef CONFIG_RWSEM_PRIO_AWARE
+	sem->m_count = 0;
+#endif
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+	sem->ux_dep_task = NULL;
+#endif /* OPLUS_FEATURE_SCHED_ASSIST */
 }
 
 EXPORT_SYMBOL(__init_rwsem);
-
-enum rwsem_waiter_type {
-	RWSEM_WAITING_FOR_WRITE,
-	RWSEM_WAITING_FOR_READ
-};
-
-struct rwsem_waiter {
-	struct list_head list;
-	struct task_struct *task;
-	enum rwsem_waiter_type type;
-};
 
 enum rwsem_wake_type {
 	RWSEM_WAKE_ANY,		/* Wake whatever's at head of wait list */
@@ -140,6 +142,10 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
 
 	if (waiter->type == RWSEM_WAITING_FOR_WRITE) {
 		if (wake_type == RWSEM_WAKE_ANY) {
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+			uxchain_rwsem_wake(waiter->task, sem);
+#endif
 			/*
 			 * Mark writer at the front of the queue for wakeup.
 			 * Until the task is actually later awoken later by
@@ -232,6 +238,10 @@ static void __rwsem_mark_wake(struct rw_semaphore *sem,
 		 * to the task to wakeup.
 		 */
 		smp_store_release(&waiter->task, NULL);
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+		uxchain_rwsem_wake(tsk, sem);
+#endif
 		/*
 		 * Ensure issuing the wakeup (either by us or someone else)
 		 * after setting the reader waiter to nil.
@@ -251,6 +261,12 @@ __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
 	long count, adjustment = -RWSEM_ACTIVE_READ_BIAS;
 	struct rwsem_waiter waiter;
 	DEFINE_WAKE_Q(wake_q);
+	bool is_first_waiter = false;
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+	int mem_sem_flag = 0;
+	u64 sleep_begin, sleep_end;
+#endif
 
 	waiter.task = current;
 	waiter.type = RWSEM_WAITING_FOR_READ;
@@ -258,7 +274,9 @@ __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
 	raw_spin_lock_irq(&sem->wait_lock);
 	if (list_empty(&sem->wait_list))
 		adjustment += RWSEM_WAITING_BIAS;
-	list_add_tail(&waiter.list, &sem->wait_list);
+
+	/* is_first_waiter == true means we are first in the queue */
+	is_first_waiter = rwsem_list_add_per_prio(&waiter, sem);
 
 	/* we're now waiting on the lock, but no longer actively locking */
 	count = atomic_long_add_return(adjustment, &sem->count);
@@ -271,14 +289,28 @@ __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
 	 */
 	if (count == RWSEM_WAITING_BIAS ||
 	    (count > RWSEM_WAITING_BIAS &&
-	     adjustment != -RWSEM_ACTIVE_READ_BIAS))
+	     (adjustment != -RWSEM_ACTIVE_READ_BIAS ||
+	     is_first_waiter)))
 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
+
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+	if (sysctl_sched_assist_enabled) {
+		rwsem_set_inherit_ux(current, waiter.task, READ_ONCE(sem->owner), sem);
+	}
+#endif /* OPLUS_FEATURE_SCHED_ASSIST */
 
 	raw_spin_unlock_irq(&sem->wait_lock);
 	wake_up_q(&wake_q);
 
 	/* wait to be given the lock */
 	while (true) {
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+		if (current->mm && sem == &(current->mm->mmap_sem)) {
+			mem_sem_flag = 1;
+			sleep_begin = sched_clock();
+		}
+#endif
 		set_current_state(state);
 		if (!waiter.task)
 			break;
@@ -289,10 +321,28 @@ __rwsem_down_read_failed_common(struct rw_semaphore *sem, int state)
 			raw_spin_unlock_irq(&sem->wait_lock);
 			break;
 		}
+#ifdef OPLUS_FEATURE_HEALTHINFO
+#ifdef CONFIG_OPLUS_JANK_INFO
+		current->in_downread = 1;
+#endif
+#endif /* OPLUS_FEATURE_HEALTHINFO */
 		schedule();
+#ifdef OPLUS_FEATURE_HEALTHINFO
+#ifdef CONFIG_OPLUS_JANK_INFO
+		current->in_downread = 0;
+#endif
+#endif /* OPLUS_FEATURE_HEALTHINFO */
 	}
 
 	__set_current_state(TASK_RUNNING);
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+	if (mem_sem_flag) {
+		sleep_end = sched_clock();
+		sysctl_mmapsem_uninterruptable_time +=
+			(sleep_end - sleep_begin) >> 20;
+	}
+#endif
 	return sem;
 out_nolock:
 	list_del(&waiter.list);
@@ -522,6 +572,12 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 	struct rwsem_waiter waiter;
 	struct rw_semaphore *ret = sem;
 	DEFINE_WAKE_Q(wake_q);
+	bool is_first_waiter = false;
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+	int mem_sem_flag = 0;
+	u64 sleep_begin, sleep_end;
+#endif
 
 	/* undo write bias from down_write operation, stop active locking */
 	count = atomic_long_sub_return(RWSEM_ACTIVE_WRITE_BIAS, &sem->count);
@@ -543,7 +599,11 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 	if (list_empty(&sem->wait_list))
 		waiting = false;
 
-	list_add_tail(&waiter.list, &sem->wait_list);
+	/*
+	 * is_first_waiter == true means we are first in the queue,
+	 * so there is no read locks that were queued ahead of us.
+	 */
+	is_first_waiter = rwsem_list_add_per_prio(&waiter, sem);
 
 	/* we're now waiting on the lock, but no longer actively locking */
 	if (waiting) {
@@ -554,7 +614,7 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 		 * no active writers, the lock must be read owned; so we try to
 		 * wake any read locks that were queued ahead of us.
 		 */
-		if (count > RWSEM_WAITING_BIAS) {
+		if (!is_first_waiter && count > RWSEM_WAITING_BIAS) {
 			__rwsem_mark_wake(sem, RWSEM_WAKE_READERS, &wake_q);
 			/*
 			 * The wakeup is normally called _after_ the wait_lock
@@ -574,6 +634,19 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 	} else
 		count = atomic_long_add_return(RWSEM_WAITING_BIAS, &sem->count);
 
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+	if (sysctl_sched_assist_enabled) {
+		rwsem_set_inherit_ux(waiter.task, current, READ_ONCE(sem->owner), sem);
+	}
+#endif /* OPLUS_FEATURE_SCHED_ASSIST */
+
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+	if (current->mm && sem == &(current->mm->mmap_sem)) {
+		mem_sem_flag = 1;
+		sleep_begin = sched_clock();
+	}
+#endif
 	/* wait until we successfully acquire the lock */
 	set_current_state(state);
 	while (true) {
@@ -585,8 +658,17 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 		do {
 			if (signal_pending_state(state, current))
 				goto out_nolock;
-
+#ifdef OPLUS_FEATURE_HEALTHINFO
+#ifdef CONFIG_OPLUS_JANK_INFO
+			current->in_downwrite = 1;
+#endif
+#endif /* OPLUS_FEATURE_HEALTHINFO */
 			schedule();
+#ifdef OPLUS_FEATURE_HEALTHINFO
+#ifdef CONFIG_OPLUS_JANK_INFO
+			current->in_downwrite = 0;
+#endif
+#endif /* OPLUS_FEATURE_HEALTHINFO */
 			set_current_state(state);
 		} while ((count = atomic_long_read(&sem->count)) & RWSEM_ACTIVE_MASK);
 
@@ -595,6 +677,14 @@ __rwsem_down_write_failed_common(struct rw_semaphore *sem, int state)
 	__set_current_state(TASK_RUNNING);
 	list_del(&waiter.list);
 	raw_spin_unlock_irq(&sem->wait_lock);
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+//#ifdef CONFIG_UXCHAIN_V2
+	if (mem_sem_flag) {
+		sleep_end = sched_clock();
+		sysctl_mmapsem_uninterruptable_time +=
+			(sleep_end - sleep_begin) >> 20;
+	}
+#endif
 
 	return ret;
 
@@ -698,6 +788,12 @@ locked:
 
 	if (!list_empty(&sem->wait_list))
 		__rwsem_mark_wake(sem, RWSEM_WAKE_ANY, &wake_q);
+
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+	if (sysctl_sched_assist_enabled) {
+		rwsem_unset_inherit_ux(sem, current);
+	}
+#endif /* OPLUS_FEATURE_SCHED_ASSIST */
 
 	raw_spin_unlock_irqrestore(&sem->wait_lock, flags);
 	wake_up_q(&wake_q);

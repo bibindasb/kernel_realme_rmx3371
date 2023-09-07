@@ -3,6 +3,11 @@
  */
 #include <linux/cpufreq_times.h>
 #include "sched.h"
+#include "walt.h"
+#ifdef OPLUS_FEATURE_TASK_CPUSTATS
+/* stat cpu usage on each tick. */
+#include <linux/task_cpustats.h>
+#endif
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 
@@ -52,11 +57,18 @@ void irqtime_account_irq(struct task_struct *curr)
 	struct irqtime *irqtime = this_cpu_ptr(&cpu_irqtime);
 	s64 delta;
 	int cpu;
+#ifdef CONFIG_SCHED_WALT
+	u64 wallclock;
+	bool account = true;
+#endif
 
 	if (!sched_clock_irqtime)
 		return;
 
 	cpu = smp_processor_id();
+#ifdef CONFIG_SCHED_WALT
+	wallclock = sched_clock_cpu(cpu);
+#endif
 	delta = sched_clock_cpu(cpu) - irqtime->irq_start_time;
 	irqtime->irq_start_time += delta;
 
@@ -70,6 +82,15 @@ void irqtime_account_irq(struct task_struct *curr)
 		irqtime_account_delta(irqtime, delta, CPUTIME_IRQ);
 	else if (in_serving_softirq() && curr != this_cpu_ksoftirqd())
 		irqtime_account_delta(irqtime, delta, CPUTIME_SOFTIRQ);
+#ifdef CONFIG_SCHED_WALT
+	else
+		account = false;
+
+	if (account)
+		sched_account_irqtime(cpu, curr, delta, wallclock);
+	else if (curr != this_cpu_ksoftirqd())
+		sched_account_irqstart(cpu, curr, wallclock);
+#endif
 }
 EXPORT_SYMBOL_GPL(irqtime_account_irq);
 
@@ -385,14 +406,30 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 		 * Also, p->stime needs to be updated for ksoftirqd.
 		 */
 		account_system_index_time(p, cputime, CPUTIME_SOFTIRQ);
+#ifdef OPLUS_FEATURE_TASK_CPUSTATS
+/* stat cpu usage on each tick. */
+		account_task_time(p, ticks, CPUTIME_SOFTIRQ);
+#endif /* OPLUS_FEATURE_TASK_CPUSTATS */
 	} else if (user_tick) {
 		account_user_time(p, cputime);
+#ifdef OPLUS_FEATURE_TASK_CPUSTATS
+/* stat cpu usage on each tick. */
+		account_task_time(p, ticks, CPUTIME_USER);
+#endif /* OPLUS_FEATURE_TASK_CPUSTATS */
 	} else if (p == rq->idle) {
 		account_idle_time(cputime);
 	} else if (p->flags & PF_VCPU) { /* System time or guest time */
 		account_guest_time(p, cputime);
+#ifdef OPLUS_FEATURE_TASK_CPUSTATS
+/* stat cpu usage on each tick. */
+		account_task_time(p, ticks, CPUTIME_USER);
+#endif /* OPLUS_FEATURE_TASK_CPUSTATS */
 	} else {
 		account_system_index_time(p, cputime, CPUTIME_SYSTEM);
+#ifdef OPLUS_FEATURE_TASK_CPUSTATS
+/* stat cpu usage on each tick. */
+		account_task_time(p, ticks, CPUTIME_SYSTEM);
+#endif /* OPLUS_FEATURE_TASK_CPUSTATS */
 	}
 }
 
