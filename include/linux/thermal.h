@@ -26,6 +26,9 @@
 /* No upper/lower limit requirement */
 #define THERMAL_NO_LIMIT	((u32)~0)
 
+/* upper limit requirement */
+#define THERMAL_MAX_LIMIT	(THERMAL_NO_LIMIT - 1)
+
 /* Default weight of a bound cooling device */
 #define THERMAL_WEIGHT_DEFAULT 0
 
@@ -385,8 +388,8 @@ struct thermal_zone_of_device_ops {
 	int (*get_trend)(void *, int, enum thermal_trend *);
 	int (*set_trips)(void *, int, int);
 	int (*set_emul_temp)(void *, int);
-	int (*set_trip_temp)(void *, int, int);
-	int (*get_trip_temp)(void *, int, int *);
+	int (*set_trip_temp)(void *data, int trip, int temp);
+	int (*get_trip_temp)(void *data, int trip, int *temp);
 };
 
 /**
@@ -409,7 +412,6 @@ enum aggregation_logic {
 	VIRT_WEIGHTED_AVG,
 	VIRT_MAXIMUM,
 	VIRT_MINIMUM,
-	VIRT_COUNT_THRESHOLD,
 	VIRT_AGGREGATION_NR,
 };
 
@@ -529,6 +531,9 @@ void thermal_cooling_device_unregister(struct thermal_cooling_device *);
 struct thermal_zone_device *thermal_zone_get_zone_by_name(const char *name);
 struct thermal_cooling_device *thermal_zone_get_cdev_by_name(const char *name);
 int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp);
+#ifdef OPLUS_BUG_STABILITY
+int thermal_zone_get_temp_workaround(struct thermal_zone_device *tz, int *temp);
+#endif
 int thermal_zone_get_slope(struct thermal_zone_device *tz);
 int thermal_zone_get_offset(struct thermal_zone_device *tz);
 
@@ -598,6 +603,11 @@ static inline struct thermal_cooling_device *thermal_zone_get_cdev_by_name(
 static inline int thermal_zone_get_temp(
 		struct thermal_zone_device *tz, int *temp)
 { return -ENODEV; }
+#ifdef OPLUS_BUG_STABILITY
+static inline int thermal_zone_get_temp_workaround(
+		struct thermal_zone_device *tz, int *temp)
+{ return -ENODEV; }
+#endif
 static inline int thermal_zone_get_slope(
 		struct thermal_zone_device *tz)
 { return -ENODEV; }

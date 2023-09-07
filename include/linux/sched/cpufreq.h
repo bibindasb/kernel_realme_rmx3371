@@ -10,6 +10,16 @@
 
 #define SCHED_CPUFREQ_IOWAIT	(1U << 0)
 #define SCHED_CPUFREQ_MIGRATION	(1U << 1)
+#define SCHED_CPUFREQ_INTERCLUSTER_MIG (1U << 3)
+#define SCHED_CPUFREQ_WALT (1U << 4)
+#define SCHED_CPUFREQ_PL        (1U << 5)
+#define SCHED_CPUFREQ_EARLY_DET (1U << 6)
+#define SCHED_CPUFREQ_CONTINUE (1U << 8)
+
+#ifdef OPLUS_FEATURE_SCHED_ASSIST
+#define SCHED_CPUFREQ_RESET (1U << 7)
+#define SCHED_CPUFREQ_BOOST (1U << 9)
+#endif /* OPLUS_FEATURE_SCHED_ASSIST */
 
 #ifdef CONFIG_CPU_FREQ
 struct cpufreq_policy;
