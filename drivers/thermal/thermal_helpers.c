@@ -22,6 +22,11 @@
 
 #include "thermal_core.h"
 
+#ifdef OPLUS_BUG_STABILITY
+#include <linux/timer.h>
+#include <linux/delay.h>
+#endif
+
 int get_tz_trend(struct thermal_zone_device *tz, int trip)
 {
 	enum thermal_trend trend;
@@ -106,12 +111,65 @@ int thermal_zone_get_temp(struct thermal_zone_device *tz, int *temp)
 		if (!ret && *temp < crit_temp)
 			*temp = tz->emul_temperature;
 	}
-
+	trace_thermal_query_temp(tz, *temp);
 	mutex_unlock(&tz->lock);
 exit:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(thermal_zone_get_temp);
+
+#ifdef OPLUS_BUG_STABILITY
+int thermal_zone_get_temp_workaround(struct thermal_zone_device *tz, int *temp)
+{
+	int ret = -EINVAL;
+	int count;
+	int crit_temp = INT_MAX;
+	enum thermal_trip_type type;
+	int i = 30;
+
+	if (!tz || IS_ERR(tz) || !tz->ops->get_temp)
+		goto exit;
+
+	while(!mutex_trylock(&tz->lock))
+	{
+		if(--i <= 0)
+			goto last_exit;
+		msleep(100);
+	}
+
+	ret = tz->ops->get_temp(tz, temp);
+
+	if (IS_ENABLED(CONFIG_THERMAL_EMULATION) && tz->emul_temperature) {
+		for (count = 0; count < tz->trips; count++) {
+			ret = tz->ops->get_trip_type(tz, count, &type);
+			if (!ret && type == THERMAL_TRIP_CRITICAL) {
+				ret = tz->ops->get_trip_temp(tz, count,
+						&crit_temp);
+				break;
+			}
+		}
+
+		/*
+		 * Only allow emulating a temperature when the real temperature
+		 * is below the critical temperature so that the emulation code
+		 * cannot hide critical conditions.
+		 */
+		if (!ret && *temp < crit_temp)
+			*temp = tz->emul_temperature;
+	}
+	trace_thermal_query_temp(tz, *temp);
+	mutex_unlock(&tz->lock);
+exit:
+	return ret;
+last_exit:
+	*temp = tz->last_temperature;
+	if (tz->last_temperature == THERMAL_TEMP_INVALID || tz->last_temperature == THERMAL_TEMP_INVALID_LOW)
+		*temp = 0;
+	printk("QMI arount: Can not get lock, goto last_exit\n");
+	return 0;
+}
+EXPORT_SYMBOL_GPL(thermal_zone_get_temp_workaround);
+#endif
 
 void thermal_zone_set_trips(struct thermal_zone_device *tz)
 {
@@ -140,10 +198,6 @@ void thermal_zone_set_trips(struct thermal_zone_device *tz)
 			high = trip_temp;
 	}
 
-	/* No need to change trip points */
-	if (tz->prev_low_trip == low && tz->prev_high_trip == high)
-		goto exit;
-
 	tz->prev_low_trip = low;
 	tz->prev_high_trip = high;
 
@@ -157,6 +211,7 @@ void thermal_zone_set_trips(struct thermal_zone_device *tz)
 	ret = tz->ops->set_trips(tz, low, high);
 	if (ret)
 		dev_err(&tz->device, "Failed to set trips: %d\n", ret);
+	trace_thermal_set_trip(tz);
 
 exit:
 	mutex_unlock(&tz->lock);
@@ -166,7 +221,7 @@ EXPORT_SYMBOL_GPL(thermal_zone_set_trips);
 void thermal_cdev_update(struct thermal_cooling_device *cdev)
 {
 	struct thermal_instance *instance;
-	unsigned long target = 0;
+	unsigned long current_target = 0, min_target = ULONG_MAX;
 
 	mutex_lock(&cdev->lock);
 	/* cooling device is updated*/
@@ -176,22 +231,33 @@ void thermal_cdev_update(struct thermal_cooling_device *cdev)
 	}
 
 	/* Make sure cdev enters the deepest cooling state */
+	current_target = cdev->sysfs_cur_state_req;
+	min_target = cdev->sysfs_min_state_req;
 	list_for_each_entry(instance, &cdev->thermal_instances, cdev_node) {
 		dev_dbg(&cdev->device, "zone%d->target=%lu\n",
 			instance->tz->id, instance->target);
 		if (instance->target == THERMAL_NO_TARGET)
 			continue;
-		if (instance->target > target)
-			target = instance->target;
+		if (instance->tz->governor->min_state_throttle) {
+			if (instance->target < min_target)
+				min_target = instance->target;
+		} else {
+			if (instance->target > current_target)
+				current_target = instance->target;
+		}
 	}
 
-	if (!cdev->ops->set_cur_state(cdev, target))
-		thermal_cooling_device_stats_update(cdev, target);
+	trace_cdev_update_start(cdev);
+	if (!cdev->ops->set_cur_state(cdev, current_target))
+		thermal_cooling_device_stats_update(cdev, current_target);
+	if (cdev->ops->set_min_state)
+		cdev->ops->set_min_state(cdev, min_target);
 
 	cdev->updated = true;
 	mutex_unlock(&cdev->lock);
-	trace_cdev_update(cdev, target);
-	dev_dbg(&cdev->device, "set to state %lu\n", target);
+	trace_cdev_update(cdev, current_target, min_target);
+	dev_dbg(&cdev->device, "set to state %lu min state %lu\n",
+				current_target, min_target);
 }
 EXPORT_SYMBOL(thermal_cdev_update);
 

@@ -90,6 +90,11 @@ config PREVENT_FIRMWARE_BUILD
 
 source "drivers/base/firmware_loader/Kconfig"
 
+config FW_CACHE
+       bool "Enable firmware caching during suspend"
+       depends on PM_SLEEP
+       default n
+
 config WANT_DEV_COREDUMP
 	bool
 	help
@@ -150,6 +155,10 @@ config DEBUG_TEST_DRIVER_REMOVE
 	  test this functionality.
 
 source "drivers/base/test/Kconfig"
+
+#ifdef OPLUS_FEATURE_TP_BASIC
+source "drivers/base/kernelFwUpdate/Kconfig"
+#endif /*OPLUS_FEATURE_TP_BASIC*/
 
 config SYS_HYPERVISOR
 	bool

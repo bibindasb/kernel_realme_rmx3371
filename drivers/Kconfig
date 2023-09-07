@@ -57,6 +57,8 @@ source "drivers/char/Kconfig"
 
 source "drivers/i2c/Kconfig"
 
+source "drivers/i3c/Kconfig"
+
 source "drivers/spi/Kconfig"
 
 source "drivers/spmi/Kconfig"
@@ -136,6 +138,8 @@ source "drivers/virtio/Kconfig"
 source "drivers/hv/Kconfig"
 
 source "drivers/xen/Kconfig"
+
+source "drivers/vservices/Kconfig"
 
 source "drivers/staging/Kconfig"
 
@@ -221,5 +225,17 @@ source "drivers/siox/Kconfig"
 
 source "drivers/slimbus/Kconfig"
 
+source "drivers/esoc/Kconfig"
+
+source "drivers/sensors/Kconfig"
+
+source "drivers/gpu/msm/Kconfig"
+
 source "drivers/energy_model/Kconfig"
+
+#ifdef OPLUS_NFC_BRINGUP
+#Add for the kernel Macro for NXP PN557 NFC kernel
+source "drivers/nfc/pn553-i2c/Kconfig"
+source "drivers/nfc/p73-spi/Kconfig"
+#endif /*OPLUS_NFC_BRINGUP*/
 endmenu
