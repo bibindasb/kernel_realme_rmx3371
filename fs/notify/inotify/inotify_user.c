@@ -350,7 +350,7 @@ static int inotify_find_inode(const char __user *dirname, struct path *path, uns
 	if (error)
 		return error;
 	/* you can only watch an inode if you have read permissions on it */
-	error = inode_permission(path->dentry->d_inode, MAY_READ);
+	error = inode_permission2(path->mnt, path->dentry->d_inode, MAY_READ);
 	if (error)
 		path_put(path);
 	return error;
@@ -583,6 +583,10 @@ static int inotify_new_watch(struct fsnotify_group *group,
 
 	/* increment the number of watches the user has */
 	if (!inc_inotify_watches(group->inotify_data.ucounts)) {
+#ifdef VENDOR_EDIT
+		if (printk_ratelimit())
+			printk(KERN_ERR "inotify_new_watch:return false,uid=%ul\n", current_uid());
+#endif
 		inotify_remove_from_idr(group, tmp_i_mark);
 		ret = -ENOSPC;
 		goto out_err;
