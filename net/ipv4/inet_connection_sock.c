@@ -360,6 +360,13 @@ int inet_csk_get_port(struct sock *sk, unsigned short snum)
 	head = &hinfo->bhash[inet_bhashfn(net, port,
 					  hinfo->bhash_size)];
 	spin_lock_bh(&head->lock);
+
+	if (inet_is_local_reserved_port(net, snum) &&
+	    !sysctl_reserved_port_bind) {
+		ret = 1;
+		goto fail_unlock;
+	}
+
 	inet_bind_bucket_for_each(tb, &head->chain)
 		if (net_eq(ib_net(tb), net) && tb->port == port)
 			goto tb_found;
@@ -1124,6 +1131,14 @@ struct dst_entry *inet_csk_update_pmtu(struct sock *sk, u32 mtu)
 			goto out;
 	}
 	dst->ops->update_pmtu(dst, sk, NULL, mtu, true);
+	#ifdef OPLUS_FEATURE_WIFI_MTUDETECT
+	//Add for [1066205] when receives ICMP_FRAG_NEEDED, reduces the mtu of net_device.
+	pr_err("%s: current_mtu = %d , frag_mtu = %d mtu = %d\n", __func__, dst->dev->mtu, dst_mtu(dst),mtu);
+	//do not use dst_mtu here, because dst_mtu should be changed by update_pmtu after inet_csk_rebuild_route
+	if (dst->dev->mtu > mtu && mtu > IPV6_MIN_MTU) {
+		dst->dev->mtu = mtu;
+	}
+	#endif /* OPLUS_FEATURE_WIFI_MTUDETECT */
 
 	dst = __sk_dst_check(sk, 0);
 	if (!dst)

@@ -2379,6 +2379,13 @@ static void __ip6_rt_update_pmtu(struct dst_entry *dst, const struct sock *sk,
 	if (confirm_neigh)
 		dst_confirm_neigh(dst, daddr);
 
+#ifdef OPLUS_BUG_STABILITY
+        //ipv6 RFC8201 test
+        if (mtu < IPV6_MIN_MTU) {
+                return;
+        }
+#endif /* OPLUS_BUG_STABILITY */
+
 	mtu = max_t(u32, mtu, IPV6_MIN_MTU);
 	if (mtu >= dst_mtu(dst))
 		return;
@@ -3519,7 +3526,6 @@ static struct fib6_info *rt6_get_route_info(struct net *net,
 					   struct net_device *dev)
 {
 	u32 tb_id = l3mdev_fib_table(dev) ? : addrconf_rt_table(dev, RT6_TABLE_INFO);
-	int ifindex = dev->ifindex;
 	struct fib6_node *fn;
 	struct fib6_info *rt = NULL;
 	struct fib6_table *table;
@@ -3534,7 +3540,7 @@ static struct fib6_info *rt6_get_route_info(struct net *net,
 		goto out;
 
 	for_each_fib6_node_rt_rcu(fn) {
-		if (rt->fib6_nh.nh_dev->ifindex != ifindex)
+		if (rt->fib6_nh.nh_dev->ifindex != dev->ifindex)
 			continue;
 		if ((rt->fib6_flags & (RTF_ROUTEINFO|RTF_GATEWAY)) != (RTF_ROUTEINFO|RTF_GATEWAY))
 			continue;

@@ -241,6 +241,10 @@ struct packet_skb_cb {
 static void __fanout_unlink(struct sock *sk, struct packet_sock *po);
 static void __fanout_link(struct sock *sk, struct packet_sock *po);
 
+//#ifdef OPLUS_FEATURE_DHCP
+int (*handle_dhcp)(struct sock *sk, struct sk_buff *skb, struct net_device *dev, struct packet_type *pt) = NULL;
+EXPORT_SYMBOL(handle_dhcp);
+//#endif /* OPLUS_FEATURE_DHCP */
 static int packet_direct_xmit(struct sk_buff *skb)
 {
 	return dev_direct_xmit(skb, packet_pick_tx_queue(skb));
@@ -2123,6 +2127,13 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	/* drop conntrack reference */
 	nf_reset(skb);
 
+//#ifdef OPLUS_FEATURE_DHCP
+    if (handle_dhcp != NULL && handle_dhcp(sk, skb, dev, pt)) {
+        printk("drop dhcp offer packet");
+        goto drop;
+    }
+//#endif /* OPLUS_FEATURE_DHCP */
+
 	spin_lock(&sk->sk_receive_queue.lock);
 	po->stats.stats1.tp_packets++;
 	sock_skb_set_dropcount(sk, skb);
@@ -3969,7 +3980,7 @@ static int packet_getsockopt(struct socket *sock, int level, int optname,
 			len = sizeof(int);
 		if (len < sizeof(int))
 			return -EINVAL;
-		if (copy_from_user(&val, optval, len))
+		if (copy_from_user(&val, optval, sizeof(val)))
 			return -EFAULT;
 		switch (val) {
 		case TPACKET_V1:
@@ -4437,9 +4448,10 @@ static int packet_set_ring(struct sock *sk, union tpacket_req_u *req_u,
 	}
 
 out_free_pg_vec:
-	bitmap_free(rx_owner_map);
-	if (pg_vec)
+    if (pg_vec){
+    bitmap_free(rx_owner_map);
 		free_pg_vec(pg_vec, order, req->tp_block_nr);
+    }
 out:
 	return err;
 }

@@ -87,6 +87,14 @@
 
 #include <trace/events/tcp.h>
 
+//#ifdef OPLUS_FEATURE_NWPOWER
+#include <net/oplus_nwpower.h>
+//#endif /* OPLUS_FEATURE_NWPOWER */
+
+#ifdef OPLUS_FEATURE_WIFI_ROUTERBOOST
+#include "net/oplus/oplus_router_boost.h"
+#endif /* OPLUS_FEATURE_WIFI_ROUTERBOOST */
+
 #ifdef CONFIG_TCP_MD5SIG
 static int tcp_v4_md5_hash_hdr(char *md5_hash, const struct tcp_md5sig_key *key,
 			       __be32 daddr, __be32 saddr, const struct tcphdr *th);
@@ -1702,6 +1710,10 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	struct sock *sk;
 	int ret;
 
+	//#ifdef OPLUS_FEATURE_NWPOWER
+	oplus_match_ipa_ip_wakeup(OPLUS_TCP_TYPE_V4, skb);
+	//#endif /* OPLUS_FEATURE_NWPOWER */
+
 	if (skb->pkt_type != PACKET_HOST)
 		goto discard_it;
 
@@ -1733,6 +1745,17 @@ lookup:
 			       th->dest, sdif, &refcounted);
 	if (!sk)
 		goto no_tcp_socket;
+
+	//#ifdef OPLUS_FEATURE_NWPOWER
+	oplus_match_ipa_tcp_wakeup(OPLUS_TCP_TYPE_V4, sk);
+	//#endif /* OPLUS_FEATURE_NWPOWER */
+
+	#ifdef OPLUS_FEATURE_WIFI_ROUTERBOOST
+	if (oplus_router_boost_handler != NULL &&
+		oplus_router_boost_handler(sk, skb) < 0) {
+		goto discard_it;
+	}
+	#endif /* OPLUS_FEATURE_WIFI_ROUTERBOOST */
 
 process:
 	if (sk->sk_state == TCP_TIME_WAIT)
@@ -1854,6 +1877,9 @@ bad_packet:
 	}
 
 discard_it:
+	//#ifdef OPLUS_FEATURE_NWPOWER
+	oplus_ipa_schedule_work();
+	//#endif /* OPLUS_FEATURE_NWPOWER */
 	/* Discard frame. */
 	kfree_skb(skb);
 	return 0;
@@ -2313,6 +2339,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 	__be32 src = inet->inet_rcv_saddr;
 	__u16 destp = ntohs(inet->inet_dport);
 	__u16 srcp = ntohs(inet->inet_sport);
+	__u8 seq_state = sk->sk_state;
 	int rx_queue;
 	int state;
 
@@ -2332,6 +2359,9 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 		timer_expires = jiffies;
 	}
 
+	if (inet->transparent)
+		seq_state |= 0x80;
+
 	state = inet_sk_state_load(sk);
 	if (state == TCP_LISTEN)
 		rx_queue = sk->sk_ack_backlog;
@@ -2344,7 +2374,7 @@ static void get_tcp4_sock(struct sock *sk, struct seq_file *f, int i)
 
 	seq_printf(f, "%4d: %08X:%04X %08X:%04X %02X %08X:%08X %02X:%08lX "
 			"%08X %5u %8d %lu %d %pK %lu %lu %u %u %d",
-		i, src, srcp, dest, destp, state,
+		i, src, srcp, dest, destp, seq_state,
 		tp->write_seq - tp->snd_una,
 		rx_queue,
 		timer_active,
@@ -2565,6 +2595,11 @@ static int __net_init tcp_sk_init(struct net *net)
 	net->ipv4.sysctl_tcp_sack = 1;
 	net->ipv4.sysctl_tcp_window_scaling = 1;
 	net->ipv4.sysctl_tcp_timestamps = 1;
+
+	#ifdef OPLUS_BUG_STABILITY
+	net->ipv4.sysctl_tcp_random_timestamp = 1;
+	#endif /* OPLUS_BUG_STABILITY */
+
 	net->ipv4.sysctl_tcp_early_retrans = 3;
 	net->ipv4.sysctl_tcp_recovery = TCP_RACK_LOSS_DETECTION;
 	net->ipv4.sysctl_tcp_slow_start_after_idle = 1; /* By default, RFC2861 behavior.  */

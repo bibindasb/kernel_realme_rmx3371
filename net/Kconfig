@@ -92,6 +92,12 @@ source "net/netlabel/Kconfig"
 
 endif # if INET
 
+config ANDROID_PARANOID_NETWORK
+	bool "Only allow certain groups to create sockets"
+	default y
+	help
+		none
+
 config NETWORK_SECMARK
 	bool "Security Marking"
 	help
@@ -321,6 +327,15 @@ config NET_FLOW_LIMIT
 	  with many clients some protection against DoS by a single (spoofed)
 	  flow that greatly exceeds average workload.
 
+config SOCKEV_NLMCAST
+	bool "Enable SOCKEV Netlink Multicast"
+	default n
+	help
+	  Default client for SOCKEV notifier events. Sends multicast netlink
+	  messages whenever the socket event notifier is invoked. Enable if
+	  user space entities need to be notified of socket events without
+	  having to poll /proc
+
 menu "Network testing"
 
 config NET_PKTGEN
@@ -457,3 +472,12 @@ config HAVE_CBPF_JIT
 # Extended BPF JIT (eBPF)
 config HAVE_EBPF_JIT
 	bool
+
+
+
+source "net/oplus_score/Kconfig"
+
+
+source "net/oplus_connectivity_sla/Kconfig"
+
+source "net/oplus_modules/Kconfig"
