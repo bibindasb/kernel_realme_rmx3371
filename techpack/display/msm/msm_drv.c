@@ -662,7 +662,7 @@ static int msm_drm_display_thread_create(struct sched_param param,
 	 * This can lead to commit miss TE/retire event delay
 	 */
 	if (oplus_adfr_is_support()) {
-		if (oplus_adfr_thread_create(&param, priv, ddev, dev)) {
+		if (oplus_adfr_thread_create(priv, ddev, dev)) {
 			return -EINVAL;
 		}
 	}
