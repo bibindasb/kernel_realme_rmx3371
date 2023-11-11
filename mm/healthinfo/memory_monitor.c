@@ -154,7 +154,6 @@ void memory_alloc_monitor(gfp_t gfp_mask, unsigned int order, u64 wait_ms)
 
 		ktime_get_real_ts64(&ts);
 		plwr->timestamp = (u64)ts.tv_sec;
-		plwr->timestamp_ns = (u64)ts.tv_nsec;
 
 		plwr->ms = wait_ms;
 	}
@@ -210,7 +209,6 @@ void ionwait_monitor(u64 wait_ms)
 
 		ktime_get_real_ts64(&ts);
 		plwr->timestamp = (u64)ts.tv_sec;
-		plwr->timestamp_ns = (u64)ts.tv_nsec;
 
 		plwr->ms = wait_ms;
 	}
