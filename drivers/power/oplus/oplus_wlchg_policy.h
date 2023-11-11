@@ -31,7 +31,7 @@
 #define WPC_CHARGE_CURRENT_ZERO 0 // 0mA
 #define WPC_CHARGE_CURRENT_INIT_100MA 100
 #define WPC_CHARGE_CURRENT_200MA 200
-#define WPC_CHARGE_CURRENT_DEFAULT 500 // 500mA
+#define WPC_CHARGE_CURRENT_DEFAULT 250 // 250mA
 #define WPC_CHARGE_CURRENT_ON_TRX 650 // 650mA
 #define WPC_CHARGE_CURRENT_BPP 1000 // 1000mA
 #define WPC_CHARGE_CURRENT_EPP 1100
@@ -83,7 +83,7 @@
 #define WPC_TERMINATION_CURRENT 200
 #define WPC_TERMINATION_VOLTAGE WPC_TERMINATION_VOLTAGE_DEFAULT
 #define WPC_RECHARGE_VOLTAGE_OFFSET 200
-//#define WPC_PRECHARGE_CURRENT 300
+
 #define WPC_CHARGER_INPUT_CURRENT_LIMIT_DEFAULT 1000
 
 #define DCP_TERMINATION_CURRENT 600
@@ -126,6 +126,7 @@
 #define ADAPTER_TYPE_UNKNOWN 0
 #define ADAPTER_TYPE_FASTCHAGE_DASH 1
 #define ADAPTER_TYPE_FASTCHAGE_WARP 2
+#define ADAPTER_TYPE_FASTCHAGE_PD_65W	7
 #define ADAPTER_TYPE_USB 3
 #define ADAPTER_TYPE_NORMAL_CHARGE 4
 #define ADAPTER_TYPE_EPP 5
@@ -146,7 +147,7 @@
 #define CHARGE_FULL_FAN_THREOD_HI 380
 
 #define FASTCHG_CURR_ERR_MAX 5
-
+#define WPC_ADAPTER_TYPE_MASK		0x07
 #define WPC_ADAPTER_ID_MASK	0xF8
 #define WPC_RESPONE_ADAPTER_TYPE	0xF1
 #define WPC_RESPONE_INTO_FASTCHAGE	0xF2
@@ -235,13 +236,6 @@ enum wlchg_msg_type {
 	WLCHG_TX_ID_MSG,
 };
 
-enum wls_status_keep_type {
-	WLS_SK_NULL,
-	WLS_SK_BY_KERNEL,
-	WLS_SK_BY_HAL,
-	WLS_SK_WAIT_TIMEOUT,
-};
-
 struct wlchg_msg_t {
 	char type;
 	char data;
@@ -264,6 +258,7 @@ struct wpc_data {
 	bool charge_done;
 	int adapter_type;
 	int charge_type;
+	int adapter_id;
 	int charge_voltage;
 	int charge_current;
 	bool rx_adc_test_enable;
@@ -312,6 +307,7 @@ struct wpc_data {
 
 	bool geted_tx_id;
 	bool quiet_mode_enabled;
+	bool quiet_mode_init;
 	bool get_adapter_err;
 	bool epp_working;
 	/* Indicates whether the message of getting adapter type was sent successfully */
@@ -326,7 +322,7 @@ struct wpc_data {
 	bool fastchg_display_delay;
 	bool cep_timeout_adjusted;
 	bool fastchg_restart;
-
+	bool startup_fod_parm;
 	/*--------------------For OPLUG Interface------------------*/
 	bool fastchg_ing;
 	bool wpc_ffc_charge;
@@ -438,6 +434,13 @@ bool oplus_wpc_get_fw_updating(void);
 
 int oplus_wpc_get_adapter_type(void);
 
+int oplus_wpc_get_break_sub_crux_info(char *sub_crux_info);
+
+int oplus_wpc_get_dock_type(void);
+
+int oplus_wpc_get_skewing_curr(void);
+
+bool oplus_wpc_get_verity(void);
 int oplus_wpc_set_tx_start(void);
 void oplus_wpc_set_wls_pg_value(int value);
 void oplus_wpc_dis_tx_power(void);
@@ -504,7 +507,10 @@ struct charge_param {
 	int epp_curr_step[EPP_CURR_STEP_MAX];
 	bool fastchg_fod_enable;
 	unsigned char fastchg_match_q;
+	unsigned char fastchg_match_q_new;
 	unsigned char fastchg_fod_parm[FOD_PARM_LENGTH];
+	unsigned char fastchg_fod_parm_new[FOD_PARM_LENGTH];
+	unsigned char fastchg_fod_parm_startup[FOD_PARM_LENGTH];
 	struct op_fastchg_ffc_step ffc_chg;
 };
 

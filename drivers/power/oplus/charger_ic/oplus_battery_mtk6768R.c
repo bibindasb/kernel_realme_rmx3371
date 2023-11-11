@@ -462,7 +462,7 @@ int mtk_chr_is_charger_exist(unsigned char *exist)
 void oplus_set_otg_switch_status(bool value)
 {
 	if (pinfo != NULL ) {
-		printk(KERN_ERR "[OPPO_CHG][%s]: otg switch[%d]\n", __func__, value);
+		printk(KERN_ERR "[OPLUS_CHG][%s]: otg switch[%d]\n", __func__, value);
 		musb_ctrl_host(value);
 	}
 }
@@ -1324,33 +1324,33 @@ static bool oplus_usbtemp_check_is_support(void)
 
 static int oplus_dischg_gpio_init(struct oplus_chg_chip *chip)
 {
-       if (!chip) {
-               chg_err("oppo_chip not ready!\n");
-               return -EINVAL;
-       }
+	if (!chip) {
+		chg_err("oplus_chip not ready!\n");
+		return -EINVAL;
+	}
 
-       chip->normalchg_gpio.pinctrl = devm_pinctrl_get(chip->dev);
+	chip->normalchg_gpio.pinctrl = devm_pinctrl_get(chip->dev);
 
-       if (IS_ERR_OR_NULL(chip->normalchg_gpio.pinctrl)) {
-               chg_err("get dischg_pinctrl fail\n");
-               return -EINVAL;
-       }
+	if (IS_ERR_OR_NULL(chip->normalchg_gpio.pinctrl)) {
+		chg_err("get dischg_pinctrl fail\n");
+		return -EINVAL;
+	}
 
-       chip->normalchg_gpio.dischg_enable = pinctrl_lookup_state(chip->normalchg_gpio.pinctrl, "dischg_enable");
-       if (IS_ERR_OR_NULL(chip->normalchg_gpio.dischg_enable)) {
-               chg_err("get dischg_enable fail\n");
-               return -EINVAL;
-       }
+	chip->normalchg_gpio.dischg_enable = pinctrl_lookup_state(chip->normalchg_gpio.pinctrl, "dischg_enable");
+	if (IS_ERR_OR_NULL(chip->normalchg_gpio.dischg_enable)) {
+		chg_err("get dischg_enable fail\n");
+		return -EINVAL;
+	}
 
-       chip->normalchg_gpio.dischg_disable = pinctrl_lookup_state(chip->normalchg_gpio.pinctrl, "dischg_disable");
-       if (IS_ERR_OR_NULL(chip->normalchg_gpio.dischg_disable)) {
-               chg_err("get dischg_disable fail\n");
-               return -EINVAL;
-       }
+	chip->normalchg_gpio.dischg_disable = pinctrl_lookup_state(chip->normalchg_gpio.pinctrl, "dischg_disable");
+	if (IS_ERR_OR_NULL(chip->normalchg_gpio.dischg_disable)) {
+		chg_err("get dischg_disable fail\n");
+		return -EINVAL;
+	}
 
-       pinctrl_select_state(chip->normalchg_gpio.pinctrl, chip->normalchg_gpio.dischg_disable);
+	pinctrl_select_state(chip->normalchg_gpio.pinctrl, chip->normalchg_gpio.dischg_disable);
 
-       return 0;
+	return 0;
 }
 
 
@@ -2370,6 +2370,8 @@ void mtk_charger_int_handler(void)
 #endif /*CONFIG_OPLUS_CHARGER_MTK6769*/
 		charger_manager_notifier(pinfo, CHARGER_NOTIFY_START_CHARGING);
 	}
+	if (g_oplus_chip && g_oplus_chip->usb_psy)
+		power_supply_changed(g_oplus_chip->usb_psy);
 	chr_err("wake_up_charger\n");
 	_wake_up_charger(pinfo);
 }
@@ -3747,9 +3749,9 @@ void charger_debug_init(void)
 {
 	struct proc_dir_entry *charger_dir;
 
-	charger_dir = proc_mkdir("charger", NULL);
+	charger_dir = proc_mkdir("mtk_charger", NULL);
 	if (!charger_dir) {
-		chr_err("fail to mkdir /proc/charger\n");
+		chr_err("fail to mkdir /proc/mtk_charger\n");
 		return;
 	}
 

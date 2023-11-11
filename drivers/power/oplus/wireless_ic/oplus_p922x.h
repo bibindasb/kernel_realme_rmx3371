@@ -158,6 +158,7 @@ struct oplus_p922x_ic{
     //int         batt_volt_2cell_max;    //for WPC
     //int         batt_volt_2cell_min;    //for WPC
     atomic_t                         suspended;
+    int wireless_not_support_cool_down;
 };
 
 

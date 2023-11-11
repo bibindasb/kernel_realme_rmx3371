@@ -13,8 +13,8 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/consumer.h>
 #include <linux/extcon-provider.h>
-#include <../drivers/power/supply/qcom/storm-watch.h>
-#include <../drivers/power/supply/qcom/battery.h>
+#include "../../supply/qcom/storm-watch.h"
+#include "../../supply/qcom/battery.h"
 
 #ifdef OPLUS_FEATURE_CHG_BASIC
 #include <linux/time.h>
@@ -539,6 +539,7 @@ struct smb_charger {
 	bool hvdcp_detect_ok;
 	struct delayed_work hvdcp_disable_work;
 	struct delayed_work regist_pd;
+	int real_chg_type;
 #endif
 
 	/* pd */
@@ -706,6 +707,7 @@ struct smb_charger {
 	struct delayed_work wait_wired_charge_on;
 	struct delayed_work wait_wired_charge_off;
 	struct delayed_work otg_disable_timeout_work;
+	struct delayed_work recovery_suspend_work; /* for fix vbus remain issus after plugout*/
 #ifdef OPLUS_CUSTOM_OP_DEF
 	struct delayed_work connect_check_work;
 #endif
