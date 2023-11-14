@@ -32,7 +32,6 @@ subdir-y += synaptics
 subdir-y += ti
 subdir-y += xilinx
 subdir-y += zte
-subdir-y += qcom
 endif
 
 dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(subdir), $(wildcard $(dtstree)/$(d)/*.dts)))
