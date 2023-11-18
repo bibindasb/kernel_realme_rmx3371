@@ -652,19 +652,6 @@ static int msm_drm_display_thread_create(struct msm_drm_private *priv, struct dr
 		return ret;
 	}
 
-#ifdef OPLUS_FEATURE_ADFR
-	/**
-	 * Use a seperate adfr thread for fake frame.
-	 * Because fake frame maybe causes crtc commit/event more heavy.
-	 * This can lead to commit miss TE/retire event delay
-	 */
-	if (oplus_adfr_is_support()) {
-		if (oplus_adfr_thread_create(&param, priv, ddev, dev)) {
-			return -EINVAL;
-		}
-	}
-#endif
-
 	return 0;
 
 }
