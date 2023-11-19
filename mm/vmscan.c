@@ -49,6 +49,11 @@
 #include <linux/printk.h>
 #include <linux/dax.h>
 #include <linux/psi.h>
+#include <linux/psi.h>
+#include <linux/debugfs.h>
+#include <linux/shmem_fs.h>
+#include <linux/pagevec.h>
+#include <linux/ctype.h>
 #include <linux/simple_lmk.h>
 
 #include <asm/tlbflush.h>
