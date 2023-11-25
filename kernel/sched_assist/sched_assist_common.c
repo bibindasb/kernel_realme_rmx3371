@@ -1763,8 +1763,6 @@ void sf_task_util_record(struct task_struct *p)
 	memset(comm_now, '\0', sizeof(comm_now));
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
 	walt_util = p->wts.demand_scaled;
-#else
-	walt_util = p->ravg.demand_scaled;
 #endif
 	if (unlikely(task_is_sf_group(p))) {
 		strcpy(comm_now, p->comm);
