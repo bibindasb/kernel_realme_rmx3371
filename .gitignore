@@ -69,6 +69,11 @@ modules.builtin
 /debian/
 
 #
+# Output directory
+#
+/out
+
+#
 # Snap directory (make snap-pkg)
 #
 /snap/
@@ -85,6 +90,11 @@ modules.builtin
 !.mailmap
 !.cocciconfig
 !.clang-format
+
+#
+# Anykernel
+#
+/anykernel
 
 #
 # Generated include files
@@ -135,3 +145,4 @@ all.config
 
 # fetched Android config fragments
 kernel/configs/android-*.cfg
+
