@@ -121,6 +121,9 @@ enum msm_mdp_plane_property {
 	PLANE_PROP_PREFILL_TIME,
 	PLANE_PROP_SCALER_V1,
 	PLANE_PROP_SCALER_V2,
+#ifdef OPLUS_BUG_STABILITY
+	PLANE_PROP_CUSTOM,
+#endif /* OPLUS_BUG_STABILITY */
 	PLANE_PROP_INVERSE_PMA,
 
 	/* enum/bitmask properties */
@@ -161,6 +164,9 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_SECURITY_LEVEL,
 	CRTC_PROP_IDLE_TIMEOUT,
 	CRTC_PROP_DEST_SCALER,
+#ifdef OPLUS_BUG_STABILITY
+	CRTC_PROP_CUSTOM,
+#endif
 	CRTC_PROP_CAPTURE_OUTPUT,
 
 	CRTC_PROP_IDLE_PC_STATE,
@@ -191,6 +197,9 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_ROI_V1,
 	CONNECTOR_PROP_BL_SCALE,
 	CONNECTOR_PROP_SV_BL_SCALE,
+#ifdef OPLUS_BUG_STABILITY
+	CONNECTOR_PROP_CUSTOM,
+#endif
 	CONNECTOR_PROP_SUPPORTED_COLORSPACES,
 
 	/* enum/bitmask properties */
@@ -201,6 +210,10 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_FB_TRANSLATION_MODE,
 	CONNECTOR_PROP_QSYNC_MODE,
 	CONNECTOR_PROP_CMD_FRAME_TRIGGER_MODE,
+
+#ifdef OPLUS_FEATURE_ADFR
+	CONNECTOR_PROP_QSYNC_MIN_FPS,
+#endif
 
 	/* total # of properties */
 	CONNECTOR_PROP_COUNT
@@ -571,6 +584,9 @@ struct msm_display_kickoff_params {
 struct msm_display_conn_params {
 	uint32_t qsync_mode;
 	bool qsync_update;
+#ifdef OPLUS_FEATURE_ADFR
+	uint32_t qsync_dynamic_min_fps;
+#endif
 };
 
 /**
@@ -589,15 +605,6 @@ struct msm_drm_thread {
 	struct task_struct *thread;
 	unsigned int crtc_id;
 	struct kthread_worker worker;
-};
-
-struct msm_idle {
-	u32 timeout_ms;
-	u32 encoder_mask;
-	u32 active_mask;
-
-	spinlock_t lock;
-	struct delayed_work work;
 };
 
 struct msm_drm_private {
@@ -657,6 +664,10 @@ struct msm_drm_private {
 	struct msm_drm_thread disp_thread[MAX_CRTCS];
 	struct msm_drm_thread event_thread[MAX_CRTCS];
 
+#ifdef OPLUS_FEATURE_ADFR
+	struct msm_drm_thread adfr_thread[MAX_CRTCS];
+#endif
+
 	struct task_struct *pp_event_thread;
 	struct kthread_worker pp_event_worker;
 
@@ -710,8 +721,6 @@ struct msm_drm_private {
 
 	/* update the flag when msm driver receives shutdown notification */
 	bool shutdown_in_progress;
-
-	struct msm_idle idle;
 };
 
 /* get struct msm_kms * from drm_device * */
@@ -978,7 +987,6 @@ static inline void __exit msm_mdp_unregister(void)
 }
 #endif
 
-void msm_idle_set_state(struct drm_encoder *encoder, bool active);
 #ifdef CONFIG_DEBUG_FS
 void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m);
 void msm_gem_describe_objects(struct list_head *list, struct seq_file *m);
