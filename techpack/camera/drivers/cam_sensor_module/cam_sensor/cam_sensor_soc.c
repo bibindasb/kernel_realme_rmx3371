@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2020, Oplus. All rights reserved.
  */
 
 #include <linux/of.h>
@@ -98,7 +99,6 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
 	int i = 0;
-	uint32_t concurrency_sensors = 0;
 	struct cam_sensor_board_info *sensordata = NULL;
 	struct device_node *of_node = s_ctrl->of_node;
 	struct device_node *of_parent = NULL;
@@ -186,19 +186,6 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 			s_ctrl->cci_num = CCI_DEVICE_0;
 
 		CAM_DBG(CAM_SENSOR, "cci-index %d", s_ctrl->cci_num);
-
-		rc = of_property_read_u32(of_node,
-			"concurrency-sensors-on-same-cci",
-			&concurrency_sensors);
-		CAM_DBG(CAM_SENSOR,
-			"sensor %d concurrency_sensors %d, rc %d",
-			soc_info->index, concurrency_sensors, rc);
-		if (rc < 0 || concurrency_sensors < 2) {
-			s_ctrl->force_low_priority_for_init_setting = false;
-			rc = 0;
-		} else
-			s_ctrl->force_low_priority_for_init_setting = true;
-
 	}
 
 	if (of_property_read_u32(of_node, "sensor-position-pitch",
@@ -216,7 +203,21 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 		CAM_DBG(CAM_SENSOR, "Invalid sensor position");
 		sensordata->pos_yaw = 360;
 	}
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+	if (!of_property_read_bool(of_node, "laser-support")) {
+		CAM_DBG(CAM_SENSOR, "No laser-support defined");
+		s_ctrl->laser_support = false;
+	} else {
+		s_ctrl->laser_support = true;
+	}
+	if (!of_property_read_bool(of_node, "sem1815s-ois-support")) {
+		CAM_DBG(CAM_SENSOR, "No sem1815s-ois-support defined");
+		s_ctrl->sem1815s_ois_support = false;
+	} else {
+		s_ctrl->sem1815s_ois_support = true;
+	}
 
+#endif
 	return rc;
 
 FREE_SENSOR_DATA:
