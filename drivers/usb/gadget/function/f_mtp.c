@@ -1074,7 +1074,7 @@ static int mtp_send_event(struct mtp_dev *dev, struct mtp_event *event)
 			(req = mtp_req_get(dev, &dev->intr_idle)),
 			msecs_to_jiffies(1000));
 #else
-	ret = mtp_req_get(dev, &dev->intr_idle);
+	req = mtp_req_get(dev, &dev->intr_idle);
 #endif
 	if (!req)
 #ifndef OPLUS_FEATURE_CHG_BASIC
