@@ -617,4 +617,3 @@ int oplus_usbtemp_monitor_common(void *data)
 	return 0;
 }
 EXPORT_SYMBOL(oplus_usbtemp_monitor_common);
-
