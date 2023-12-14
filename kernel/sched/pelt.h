@@ -183,5 +183,3 @@ static inline void
 update_idle_rq_clock_pelt(struct rq *rq) { }
 
 #endif
-
-
