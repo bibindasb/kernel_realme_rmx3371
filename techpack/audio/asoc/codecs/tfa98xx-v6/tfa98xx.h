@@ -39,8 +39,8 @@
 #define TFA98XX_FLAG_CHIP_SELECTED      (1 << 16)
 
 //chip select
-#define CHIP_SELECTOR_LEFT	(1)
-#define CHIP_SELECTOR_RIGHT	(2)
+#define CHIP_SELECTOR_LEFT	(2)
+#define CHIP_SELECTOR_RIGHT	(1)
 #define CHIP_SELECTOR_STEREO	(3)
 
 //device i2c address
