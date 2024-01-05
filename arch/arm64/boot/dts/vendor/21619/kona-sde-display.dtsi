@@ -32,6 +32,7 @@
 #include "dsi-panel-oppo21615-samsung-amb655xl16-1080-2400-dsc-cmd.dtsi"
 #include "dsi-panel-oppo21619-samsung-ams662zs01-1080-2400-dsc-cmd.dtsi"
 #include "dsi-panel-oppo21619-samsung-ams662zs01-1080-2400-dvt-dsc-cmd.dtsi"
+#include "dsi-panel-oppo21619-samsung-ams662zs01-1080-2400-dvt-id13-dsc-cmd.dtsi"
 #include <dt-bindings/clock/mdss-7nm-pll-clk.h>
 
 &tlmm {
@@ -250,7 +251,8 @@
 
 		qcom,mdp = <&mdss_mdp>;
 		qcom,dsi-default-panel = <&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd
-						&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt>;
+						&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt
+						&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt_id13>;
 		//pxlw,iris-lightup-config = <&mdss_iris_cfg_oppo19065_samsung_1440_3168_dsc_cmd>;
 		pxlw,soft-iris-enable;
 	};

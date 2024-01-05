@@ -4,6 +4,7 @@
 		oplus,mdss-dsi-vendor-name = "SOFE03F";
 		oplus,mdss-dsi-manufacture = "samsung1024";
 		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
+		qcom,mdss-dsi-panel-physical-type = "oled";
 		qcom,mdss-dsi-virtual-channel-id = <0>;
 		qcom,mdss-dsi-stream = <0>;
 		qcom,mdss-dsi-bpp = <24>;
@@ -508,10 +509,10 @@
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-normal-max-level = <2047>;
-	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,mdss-dsi-bl-max-level = <2047>;
 	qcom,mdss-brightness-normal-max-level = <2047>;
-	qcom,mdss-brightness-max-level = <4095>;
-	qcom,mdss-brightness-default-level = <400>;
+	qcom,mdss-brightness-max-level = <2047>;
+	qcom,mdss-brightness-default-level = <628>;
 	qcom,platform-te-gpio = <&tlmm 66 0>;
 	qcom,platform-reset-gpio = <&tlmm 75 0>;
 	qcom,platform-panel-vout-gpio = <&tlmm 8 0>;
@@ -596,7 +597,6 @@
 };
 
 &dsi_oppo21615samsung_amb655xl16_1080_2400_cmd {
-	oplus,apollo_backlight_enable;
 	//oplus,color_srgb_status;
 	oplus,bl_interpolate_nosub;
 	oplus,bl_interpolate_remapping_nosub;

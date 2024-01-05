@@ -152,6 +152,15 @@
 };
 
 &soc {
+
+	oplus,track-charge {
+		compatible = "oplus,track-charge";
+		track,fast_chg_break_t_thd = <1000>;
+		track,general_chg_break_t_thd = <200>;
+		track,voocphy_type = <4>;
+		track,wired_fast_chg_scheme = <1>;
+	};
+
 	//#ifdef OPLUS_FEATURE_CONNFCSOFT
 	nfc_chipset {
 		compatible = "oplus-nfc-chipset";
@@ -549,6 +558,8 @@
 		project_id = <21623>;
 		irq_need_dev_resume_ok;
 		black_gesture_support;
+		black_gesture_indep_support;
+		sportify_aod_gesture_support;
 		fw_edge_limit_support;
 		pressure_report_support;
 		charger_pump_support;
@@ -1499,6 +1510,11 @@ board_temp-usr {
 				hysteresis = <1000>;
 				type = "passive";
 			};
+			active-config1 {
+				temperature = <125000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
 		};
 	};
 
@@ -1532,6 +1548,13 @@ board_temp-usr {
 		};
 	};
 
+	gpuss-1-usr {
+		status = "disabled";
+	};
+};
+
+&msm_gpu {
+	tzone-names = "gpuss-0-usr";
 };
 
 &sdhc_2 {
@@ -1825,6 +1848,7 @@ board_temp-usr {
 		qcom,oplus_batt_4400mv;
 		qcom,support_vooc_by_normal_charger_path;
 		qcom,vooc_fw_update_newmethod;
+		//qcom,smart_chg_bcc_support;
 		qcom,vooc-low-temp = <0>;
 		qcom,vooc-high-temp = <500>;
 		qcom,vooc-low-soc = <1>;
@@ -1922,6 +1946,30 @@ board_temp-usr {
 		qcom,vooc_asic_id-gpio			= <&tlmm 64 0x00>;
 		qcom,vooc-max-input-volt-support = <10000>;     //10V
 		qcom,vooc-max-input-current-support = <6500>;   //6A
+		qcom,svooc_0_to_50_little_cold_stop_cur = <1000>;
+		qcom,svooc_0_to_50_cold_stop_cur = <1000>;
+		qcom,svooc_0_to_50_little_cool_stop_cur = <1100>;
+		qcom,svooc_0_to_50_normal_low_stop_cur = <1100>;
+		qcom,svooc_0_to_50_normal_high_stop_cur = <1300>;
+		qcom,svooc_0_to_50_warm_stop_cur = <1300>;
+
+		qcom,svooc_51_to_75_little_cold_stop_cur = <1000>;
+		qcom,svooc_51_to_75_cold_stop_cur = <1000>;
+		qcom,svooc_51_to_75_little_cool_stop_cur = <1000>;
+		qcom,svooc_51_to_75_normal_low_stop_cur = <1100>;
+		qcom,svooc_51_to_75_normal_high_stop_cur = <1300>;
+
+		qcom,svooc_76_to_85_little_cold_stop_cur = <1000>;
+		qcom,svooc_76_to_85_cold_stop_cur = <1000>;
+		qcom,svooc_76_to_85_little_cool_stop_cur = <1000>;
+		qcom,svooc_76_to_85_normal_low_stop_cur = <1100>;
+		qcom,svooc_76_to_85_normal_high_stop_cur = <1300>;
+
+		qcom,svooc_86_to_90_little_cold_stop_cur = <1000>;
+		qcom,svooc_86_to_90_cold_stop_cur = <1000>;
+		qcom,svooc_86_to_90_little_cool_stop_cur = <1000>;
+		qcom,svooc_86_to_90_normal_low_stop_cur = <1100>;
+		qcom,svooc_86_to_90_normal_high_stop_cur = <1300>;
 		vooc_charge_strategy_30w {
 			strategy_1 {
 				capacity_range = <0 75>;
@@ -1988,6 +2036,73 @@ board_temp-usr {
 						3500 4454 0
 						2000 4494 0
 						1600 4500 0>;
+			};
+		};
+		svooc_charge_curve {
+			strategy_soc_0_to_50 {
+				strategy_temp_little_cold =	<4184 20 10 0
+								 4424 15 10 0
+								 4430 10 10 1>;
+				strategy_temp_cool =		<4184 25 15 0
+								 4424 20 10 0
+								 4430 10 10 1>;
+				strategy_temp_little_cool = 	<4184 50 35 0
+								 4454 40 25 0
+								 4484 30 11 0
+								 4490 11 11 1>;
+				strategy_temp_normal_low =	<4134 73 55 0
+								 4184 60 45 0
+								 4224 50 35 0
+								 4454 40 25 0
+								 4484 30 11 0
+								 4490 11 11 1>;
+				strategy_temp_normal_high =	<4134 73 55 0
+								 4184 60 45 0
+								 4224 50 35 0
+								 4454 40 25 0
+								 4484 30 13 0
+								 4490 13 13 1>;
+				strategy_temp_warm =	<4130 13 13 1>;
+			};
+
+			strategy_soc_50_to_75 {
+				strategy_temp_little_cold =	<4424 15 10 0
+								 4430 10 10 1>;
+				strategy_temp_cool =		<4424 20 10 0
+								 4430 10 10 1>;
+				strategy_temp_little_cool =	<4454 40 25 0
+								 4484 30 10 0
+								 4490 10 10 1>;
+				strategy_temp_normal_low =	<4454 40 25 0
+								 4484 30 11 0
+								 4490 11 11 1>;
+				strategy_temp_normal_high =	<4224 45 35 0
+								 4454 40 25 0
+								 4484 30 13 0
+								 4490 13 13 1>;
+			};
+
+			strategy_soc_75_to_85 {
+				strategy_temp_little_cold = 	<4430 10 10 0>;
+				strategy_temp_cool =		<4424 15 10 0
+								 4430 10 10 1>;
+				strategy_temp_little_cool =	<4484 25 10 0
+								 4490 10 10 1>;
+				strategy_temp_normal_low =	<4484 30 11 0
+								 4490 11 11 1>;
+				strategy_temp_normal_high =	<4484 30 13 0
+								 4490 13 13 1>;
+			};
+
+			strategy_soc_85_to_90 {
+				strategy_temp_little_cold = 	<4430 10 10 1>;
+				strategy_temp_cool =		<4430 10 10 1>;
+				strategy_temp_little_cool =	<4484 15 10 0
+								 4490 10 10 1>;
+				strategy_temp_normal_low =	<4484 20 11 0
+								 4490 11 11 1>;
+				strategy_temp_normal_high =	<4484 20 13 0
+								 4490 13 13 1>;
 			};
 		};
 	};
@@ -2114,7 +2229,7 @@ board_temp-usr {
 			qcom,vooc_temp_bat_hot_decidegc = <520>;
 
 			qcom,charger_current_vooc_ma_normal = <1800>;
-			qcom,chg_sw_timer_margin = <7200>;
+
 			qcom,chg_ctrl_by_calling;
 			qcom,input_current_calling_ma = <1500>;
 
@@ -2264,6 +2379,7 @@ board_temp-usr {
 
 			//for PD9V or QC9V
 			qcom,vbatt_pdqc_to_5v_thr = <4100>;
+			oplus,pdqc_9v_voltage_adaptive;
 
 			qcom,vooc_show_ui_soc_decimal;
 			qcom,ui_soc_decimal_speedmin = <20>;//2A

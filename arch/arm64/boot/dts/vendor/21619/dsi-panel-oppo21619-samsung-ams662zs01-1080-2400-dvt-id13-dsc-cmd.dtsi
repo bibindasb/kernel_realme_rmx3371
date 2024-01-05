@@ -1,8 +1,8 @@
 &mdss_mdp {
-	dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt: qcom,mdss_dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt {
+	dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt_id13: qcom,mdss_dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_id13 {
 		qcom,mdss-dsi-panel-name = "samsung ams662zs01 dvt dsc cmd mode panel";
 		oplus,mdss-dsi-vendor-name = "AMS662ZS01";
-		oplus,mdss-dsi-manufacture = "samsung1024";
+		oplus,mdss-dsi-manufacture = "samsung1024_id13";
 		qcom,mdss-dsi-panel-type = "dsi_cmd_mode";
 		qcom,mdss-dsi-panel-physical-type = "oled";
 		qcom,mdss-dsi-virtual-channel-id = <0>;
@@ -1142,7 +1142,7 @@
 	};
 };
 
-&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt {
+&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt_id13 {
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 	qcom,mdss-dsi-panel-controller = <&mdss_dsi0>;
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
@@ -1243,7 +1243,7 @@
 	};
 };
 
-&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt {
+&dsi_oppo21619samsung_ams662zs01_1080_2400_cmd_dvt_id13 {
 	//oplus,color_srgb_status;
 	oplus,bl_interpolate_nosub;
 	oplus,bl_interpolate_remapping_nosub;

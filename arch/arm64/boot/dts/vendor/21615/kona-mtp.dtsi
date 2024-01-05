@@ -154,6 +154,15 @@
 };
 
 &soc {
+
+	oplus,track-charge {
+		compatible = "oplus,track-charge";
+		track,fast_chg_break_t_thd = <1000>;
+		track,general_chg_break_t_thd = <200>;
+		track,voocphy_type = <4>;
+		track,wired_fast_chg_scheme = <1>;
+	};
+
 	//#ifdef OPLUS_FEATURE_CONNFCSOFT
 	nfc_chipset {
 		compatible = "oplus-nfc-chipset";
@@ -556,6 +565,8 @@
 		/* SW Support Feature Control */
 		health_monitor_v2_support;
 		black_gesture_support;
+		black_gesture_indep_support;
+		sportify_aod_gesture_support;
 		charger_pump_support;
 		fw_update_app_support;
 		smart_gesture_support;
@@ -1282,6 +1293,11 @@
 				hysteresis = <1000>;
 				type = "passive";
 			};
+			active-config1 {
+				temperature = <125000>;
+				hysteresis = <1000>;
+				type = "passive";
+			};
 		};
 	};
 
@@ -1315,6 +1331,13 @@
 		};
 	};
 
+	gpuss-1-usr {
+		status = "disabled";
+	};
+};
+
+&msm_gpu {
+	tzone-names = "gpuss-0-usr";
 };
 
 &sdhc_2 {
@@ -1836,6 +1859,7 @@
 			qcom,vbatt_num = <2>;
 			qcom,ffc_support;
 			qcom,dual_ffc;
+			qcom,nightstandby_support;
 			recharge_after_full;
 
 			qcom,normal_vterm_hw_inc = <18>;
@@ -1886,9 +1910,11 @@
 			qcom,chg_ctrl_by_camera;
 			qcom,sw_vfloat_over_protect_enable;
 			qcom,lpd-disable;
+			qcom,vooc_enable_charger_first;
 
 			//for PD9V or QC9V
 			qcom,vbatt_pdqc_to_5v_thr = <4100>;
+			oplus,pdqc_9v_voltage_adaptive;
 
 			qcom,vooc_show_ui_soc_decimal;
 			qcom,ui_soc_decimal_speedmin = <20>;//2A
