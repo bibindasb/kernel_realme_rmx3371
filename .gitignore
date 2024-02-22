@@ -151,6 +151,6 @@ Android.bp
 tc/
 cl10/
 buildc10.sh
-KernalSU/
-build17/
+KernelSU/
+build17.sh
 drivers/kernelsu
