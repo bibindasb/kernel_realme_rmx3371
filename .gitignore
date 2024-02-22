@@ -145,3 +145,12 @@ build.log
 #Ignoring Android.bp link file
 #
 Android.bp
+#
+#compiler files
+#
+tc/
+cl10/
+buildc10.sh
+KernalSU/
+build17/
+drivers/kernelsu
