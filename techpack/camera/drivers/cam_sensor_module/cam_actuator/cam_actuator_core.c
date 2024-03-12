@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2020, Oplus. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -11,6 +11,9 @@
 #include "cam_trace.h"
 #include "cam_common_util.h"
 #include "cam_packet_util.h"
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+#include "oplus_cam_actuator_core.h"
+#endif
 
 int32_t cam_actuator_construct_default_power_setting(
 	struct cam_sensor_power_ctrl_t *power_info)
@@ -54,6 +57,7 @@ free_power_settings:
 static int32_t cam_actuator_power_up(struct cam_actuator_ctrl_t *a_ctrl)
 {
 	int rc = 0;
+
 	struct cam_hw_soc_info  *soc_info =
 		&a_ctrl->soc_info;
 	struct cam_actuator_soc_private  *soc_private;
@@ -110,6 +114,10 @@ static int32_t cam_actuator_power_up(struct cam_actuator_ctrl_t *a_ctrl)
 	if (rc < 0)
 		CAM_ERR(CAM_ACTUATOR, "cci init failed: rc: %d", rc);
 
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+       rc = oplus_cam_actuator_power_up(a_ctrl);
+#endif
+
 	return rc;
 }
 
@@ -151,10 +159,12 @@ static int32_t cam_actuator_i2c_modes_util(
 {
 	int32_t rc = 0;
 	uint32_t i, size;
-
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
+       oplus_cam_actuator_i2c_modes_util(io_master_info,i2c_list);
+#endif
 	if (i2c_list->op_code == CAM_SENSOR_I2C_WRITE_RANDOM) {
 		rc = camera_io_dev_write(io_master_info,
-			&(i2c_list->i2c_settings), false);
+			&(i2c_list->i2c_settings));
 		if (rc < 0) {
 			CAM_ERR(CAM_ACTUATOR,
 				"Failed to random write I2C settings: %d",
@@ -165,7 +175,7 @@ static int32_t cam_actuator_i2c_modes_util(
 		rc = camera_io_dev_write_continuous(
 			io_master_info,
 			&(i2c_list->i2c_settings),
-			0, false);
+			0);
 		if (rc < 0) {
 			CAM_ERR(CAM_ACTUATOR,
 				"Failed to seq write I2C settings: %d",
@@ -176,7 +186,7 @@ static int32_t cam_actuator_i2c_modes_util(
 		rc = camera_io_dev_write_continuous(
 			io_master_info,
 			&(i2c_list->i2c_settings),
-			1, false);
+			1);
 		if (rc < 0) {
 			CAM_ERR(CAM_ACTUATOR,
 				"Failed to burst write I2C settings: %d",
@@ -501,7 +511,6 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 			cmd_buf = (uint32_t *)generic_ptr;
 			if (!cmd_buf) {
 				CAM_ERR(CAM_ACTUATOR, "invalid cmd buf");
-				cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 				rc = -EINVAL;
 				goto end;
 			}
@@ -510,7 +519,6 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 				sizeof(struct common_header)))) {
 				CAM_ERR(CAM_ACTUATOR,
 					"Invalid length for sensor cmd");
-				cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 				rc = -EINVAL;
 				goto end;
 			}
@@ -527,8 +535,6 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 				if (rc < 0) {
 					CAM_ERR(CAM_ACTUATOR,
 					"Failed to parse slave info: %d", rc);
-					cam_mem_put_cpu_buf(
-						cmd_desc[i].mem_handle);
 					goto end;
 				}
 				break;
@@ -544,8 +550,6 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 					CAM_ERR(CAM_ACTUATOR,
 					"Failed:parse power settings: %d",
 					rc);
-					cam_mem_put_cpu_buf(
-						cmd_desc[i].mem_handle);
 					goto end;
 				}
 				break;
@@ -566,13 +570,10 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 					CAM_ERR(CAM_ACTUATOR,
 					"Failed:parse init settings: %d",
 					rc);
-					cam_mem_put_cpu_buf(
-						cmd_desc[i].mem_handle);
 					goto end;
 				}
 				break;
 			}
-			cam_mem_put_cpu_buf(cmd_desc[i].mem_handle);
 		}
 
 		if (a_ctrl->cam_act_state == CAM_ACTUATOR_ACQUIRE) {
@@ -742,7 +743,6 @@ int32_t cam_actuator_i2c_pkt_parse(struct cam_actuator_ctrl_t *a_ctrl,
 	}
 
 end:
-	cam_mem_put_cpu_buf(config.packet_handle);
 	return rc;
 }
 
@@ -815,6 +815,8 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 		struct cam_sensor_acquire_dev actuator_acq_dev;
 		struct cam_create_dev_hdl bridge_params;
 
+		CAM_INFO(CAM_ACTUATOR, "CAM_ACQUIRE_DEV");
+
 		if (a_ctrl->bridge_intf.device_hdl != -1) {
 			CAM_ERR(CAM_ACTUATOR, "Device is already acquired");
 			rc = -EINVAL;
@@ -836,11 +838,6 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 
 		actuator_acq_dev.device_handle =
 			cam_create_device_hdl(&bridge_params);
-		if (actuator_acq_dev.device_handle <= 0) {
-			rc = -EFAULT;
-			CAM_ERR(CAM_ACTUATOR, "Can not create device handle");
-			goto release_mutex;
-		}
 		a_ctrl->bridge_intf.device_hdl = actuator_acq_dev.device_handle;
 		a_ctrl->bridge_intf.session_hdl =
 			actuator_acq_dev.session_handle;
@@ -865,6 +862,8 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 				"Cant release actuator: in start state");
 			goto release_mutex;
 		}
+
+		CAM_INFO(CAM_ACTUATOR, "CAM_RELEASE_DEV");
 
 		if (a_ctrl->cam_act_state == CAM_ACTUATOR_CONFIG) {
 			rc = cam_actuator_power_down(a_ctrl);
@@ -922,6 +921,7 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 	}
 		break;
 	case CAM_START_DEV: {
+		CAM_INFO(CAM_ACTUATOR, "CAM_START_DEV");
 		if (a_ctrl->cam_act_state != CAM_ACTUATOR_CONFIG) {
 			rc = -EINVAL;
 			CAM_WARN(CAM_ACTUATOR,
@@ -936,6 +936,8 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 	case CAM_STOP_DEV: {
 		struct i2c_settings_array *i2c_set = NULL;
 		int i;
+
+		CAM_INFO(CAM_ACTUATOR, "CAM_STOP_DEV");
 
 		if (a_ctrl->cam_act_state != CAM_ACTUATOR_START) {
 			rc = -EINVAL;
@@ -973,15 +975,16 @@ int32_t cam_actuator_driver_cmd(struct cam_actuator_ctrl_t *a_ctrl,
 			ACT_APPLY_SETTINGS_NOW) {
 			rc = cam_actuator_apply_settings(a_ctrl,
 				&a_ctrl->i2c_data.init_settings);
+#ifdef OPLUS_FEATURE_CAMERA_COMMON
 			if ((rc == -EAGAIN) &&
 			(a_ctrl->io_master_info.master_type == CCI_MASTER)) {
 				CAM_WARN(CAM_ACTUATOR,
 					"CCI HW is in resetting mode:: Reapplying Init settings");
-				usleep_range(1000, 1010);
+				usleep_range(5000, 5010);
 				rc = cam_actuator_apply_settings(a_ctrl,
 					&a_ctrl->i2c_data.init_settings);
 			}
-
+#endif
 			if (rc < 0)
 				CAM_ERR(CAM_ACTUATOR,
 					"Failed to apply Init settings: rc = %d",
