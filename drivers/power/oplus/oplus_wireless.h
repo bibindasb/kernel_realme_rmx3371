@@ -14,22 +14,18 @@
 
 #include <linux/timer.h>
 #include <linux/slab.h>
-#ifndef CONFIG_DISABLE_OPLUS_FUNCTION
 #include <soc/oplus/device_info.h>
 #include <soc/oplus/system/oplus_project.h>
-#endif
 #include <linux/firmware.h>
 #ifndef CONFIG_OPLUS_CHARGER_MTK
 #include <linux/soc/qcom/smem.h>
 #endif
-#include "op_wlchg_v2/oplus_chg_wls.h"
 
 #define SUPPORT_WPC
 #define SUPPORT_OPLUS_WPC_VERIFY
 
 
 #define FASTCHG_CURR_MAX_UA         1500000
-#define WPC_20W_DOCK_CURR_MAX_MA         2000
 
 #define WPC_DISCHG_WAIT_READY_EVENT						round_jiffies_relative(msecs_to_jiffies(200))
 #define WPC_DISCHG_WAIT_DEVICE_EVENT						round_jiffies_relative(msecs_to_jiffies(90*1000))
@@ -146,27 +142,15 @@
 #define DOCK_OAWV01										1
 #define DOCK_OAWV02										2
 #define DOCK_OAWV03										3
-#define DOCK_OAWV04										4
-#define DOCK_OAWV05										5
-#define DOCK_OAWV06										6
 #define DOCK_OAWV07										7
 #define DOCK_OAWV08										8
-#define DOCK_OAWV09										9
-#define DOCK_OAWV10										10
-#define DOCK_OAWV11										11
 #define DOCK_OAWV15										15
-#define DOCK_OAWV16										16
-#define DOCK_OAWV17										17
-#define DOCK_OAWV18										18
-#define DOCK_OAWV19										19
-#define DOCK_THIRD										0x1f
 
 #define DOCK_VERIFY_UNKOWN								0
 #define DOCK_VERIFY_OK										1
 #define DOCK_VERIFY_FAIL									2
 #define DOCK_VERIFY_RETRY_TIMES							5
 #define DOCK_VERIFY_TIMEOUT								40
-#define DOCK_SEND_TEMP_SOC_TIMEOUT						8
 
 #define BPP_CURRENT_INCREASE_TIME							20
 
@@ -179,21 +163,13 @@
 #define ADAPTER_TYPE_NORMAL_CHARGE							4
 #define ADAPTER_TYPE_EPP									5
 #define ADAPTER_TYPE_SVOOC_50W								6
-#define ADAPTER_TYPE_PD_65W									7
-#define ADAPTER_TYPE_THIRD_PARTY 							8
+#define ADAPTER_TYPE_PD_65W								7
 
 #define WPC_CHARGE_TYPE_DEFAULT								0
 #define WPC_CHARGE_TYPE_FAST								1
 #define WPC_CHARGE_TYPE_USB									2
 #define WPC_CHARGE_TYPE_NORMAL								3
 #define WPC_CHARGE_TYPE_EPP									4
-
-
-
-#define WLS_AUTH_AES_DATA_LEN 							16
-#define WPC_TRX_ERR_REASON_LEN	16
-#define WLS_AUTH_AES_RANDOM_LEN 							16
-#define WLS_AUTH_AES_ENCODE_LEN 							16
 
 enum {
 WPC_CHG_STATUS_DEFAULT,
@@ -272,16 +248,6 @@ ADAPTER_POWER_MAX = ADAPTER_POWER_65W,
 }E_ADAPTER_POWER;
 
 typedef enum {
-	ADAPTER_POWER_THIRD_NUKNOW,
-	ADAPTER_POWER_THIRD_20W,
-	ADAPTER_POWER_THIRD_30W,
-	ADAPTER_POWER_THIRD_40W,
-	ADAPTER_POWER_THIRD_50W,
-	ADAPTER_POWER_THIRD_MAX = ADAPTER_POWER_THIRD_50W,
-}E_ADAPTER_THIRD_POWER;
-
-
-typedef enum {
     WPC_DISCHG_STATUS_OFF,
     WPC_DISCHG_STATUS_ON,
     WPC_DISCHG_IC_READY,
@@ -298,11 +264,6 @@ typedef enum {
     WPC_DISCHG_STATUS_UNKNOW,
 }E_WPC_DISCHG_STATUS;
 
-struct wpc_trx_err_reason_table {
-	u8 trx_err;
-	const char reason[WPC_TRX_ERR_REASON_LEN];
-};
-
 typedef enum {
 	WPC_CHG_IC_ERR_NULL,
 	WPC_CHG_IC_ERR_RX_OCP,
@@ -317,6 +278,13 @@ typedef enum {
 	WPC_CHG_IC_ERR_TX_CEPTIMEOUT,
 	WPC_CHG_IC_ERR_UNKNOW,
 }E_WPC_CHG_ERR_TYPE;
+
+enum wls_status_keep_type {
+	WLS_SK_NULL,
+	WLS_SK_BY_KERNEL,
+	WLS_SK_BY_HAL,
+	WLS_SK_WAIT_TIMEOUT,
+};
 
 enum wireless_mode {
 	WIRELESS_MODE_NULL,
@@ -366,7 +334,6 @@ struct wpc_chg_param_t{
 	int svooc_input_ma;
 	int svooc_65w_iout_ma;
 	int svooc_50w_iout_ma;
-	int svooc_40w_iout_ma;
 	int bpp_temp_cold_fastchg_ma;						// -2
 	int vooc_temp_little_cold_fastchg_ma;		// 0
 	int svooc_temp_little_cold_iout_ma;
@@ -434,35 +401,14 @@ struct wpc_chg_param_t{
 	int wireless_svooc_max_temp;
 };
 
-typedef struct {
-	int effc_key_index;
-	u8 aes_random_num[WLS_AUTH_AES_RANDOM_LEN];
-	u8 aes_encode_num[WLS_AUTH_AES_ENCODE_LEN];
-} wls_third_part_auth_result_v1;
-
 struct wpc_data{
 	char charge_status;
-	bool aes_verify_data_ok;
-	int vendor_id;
-	bool tx_extern_cmd_done;
-	u32 product_id;
-	u32 extern_cmd;
-	u8 aes_key_num;
-	bool verify_by_aes;
-	bool tx_product_id_done;
-
-	wls_third_part_auth_result_v1 aes_verfith_data;
-	u8 aes_encrypt_data[WLS_AUTH_AES_RANDOM_LEN];
-
 	E_WPC_DISCHG_STATUS wpc_dischg_status;
 	int wpc_chg_err;
 	enum FASTCHG_STARTUP_STEP fastchg_startup_step;
 	enum WLCHG_TEMP_REGION_TYPE temp_region;
 	struct wpc_chg_param_t wpc_chg_param;
 	bool tx_online;
-	int trx_transfer_start_time;
-	int trx_transfer_end_time;
-	bool trx_usb_present_once;
 	bool tx_present;
 	bool charge_online;
 	int send_message;
@@ -572,8 +518,6 @@ struct wpc_data{
 	int rerun_wls_aicl_count;
 	int target_iin;
 	int support_airsvooc;
-	int phone_id;
-	unsigned long send_soc_temp_start;
 #ifdef SUPPORT_OPLUS_WPC_VERIFY
 	char random_num[8];
 	char noise_num[9];
@@ -610,12 +554,15 @@ struct gauge_auth_result {
 	unsigned char rcv_msg[GAUGE_AUTH_MSG_LEN];
 };
 
+struct wls_auth_result {
+	unsigned char random_num[WLS_AUTH_RANDOM_LEN];
+	unsigned char encode_num[WLS_AUTH_ENCODE_LEN];
+};
 
 struct oplus_chg_auth_result {
 	struct gauge_auth_result rst_k0;
 	struct gauge_auth_result rst_k1;
 	struct wls_auth_result wls_auth_data;
-	struct gauge_auth_result rst_k2;
 };
 #endif /*SUPPORT_OPLUS_WPC_VERIFY*/
 
@@ -641,7 +588,6 @@ struct oplus_wpc_operations {
 	bool (*wpc_get_ffc_charging)(void);
 	bool (*wpc_get_fw_updating)(void);
 	int (*wpc_get_adapter_type)(void);
-	int (*wpc_get_skewing_curr)(void);
 	void (*wpc_set_vbat_en)(int value);
 	void (*wpc_set_booster_en)(int value);
 	void (*wpc_set_ext1_wired_otg_en)(int value);
@@ -655,8 +601,7 @@ struct oplus_wpc_operations {
 	void (*wpc_set_wls_pg)(int value);
 	void (*wpc_dis_tx_power)(void);
 	void (*wpc_print_log)(void);
-	int (*wpc_get_break_sub_crux_info)(char *crux_info);
-	bool (*wpc_get_verity)(void);
+
 /*
 	bool nu1619_wireless_charge_start(void);
 	bool nu1619_wpc_get_fast_charging(void);
@@ -722,16 +667,11 @@ bool oplus_wpc_get_fw_updating(void);
 
 int oplus_wpc_get_adapter_type(void);
 
-int oplus_wpc_get_dock_type(void);
-
 int oplus_wpc_set_tx_start(void);
 void oplus_wpc_set_wls_pg_value(int value);
 void oplus_wpc_dis_tx_power(void);
 void oplus_wpc_print_log(void);
 void oplus_get_wpc_chip_handle(struct oplus_wpc_chip **chip);
-int oplus_wpc_get_break_sub_crux_info(char *sub_crux_info);
-int oplus_wpc_get_skewing_curr(void);
-bool oplus_wpc_get_verity(void);
 
 #endif	/* OPLUS_WPC_H */
 

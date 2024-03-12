@@ -1134,7 +1134,6 @@ struct oplus_chg_operations * oplus_get_chg_ops(void)
 
 static void register_charger_devinfo(void)
 {
-#ifndef CONFIG_DISABLE_OPLUS_FUNCTION
     int ret = 0;
     char *version;
     char *manufacture;
@@ -1145,7 +1144,6 @@ static void register_charger_devinfo(void)
     ret = register_device_proc("charger", version, manufacture);
     if (ret)
         chg_err("register_charger_devinfo fail\n");
-#endif
 }
 
 bool oplus_charger_ic_chip_is_null(void)

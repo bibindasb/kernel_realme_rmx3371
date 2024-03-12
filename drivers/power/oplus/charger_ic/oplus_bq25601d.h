@@ -9,12 +9,7 @@
 
 #include <linux/power_supply.h>
 #ifdef CONFIG_OPLUS_CHARGER_MTK
-#include <linux/version.h>
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 0))
 #include <mt-plat/charger_type.h>
-#else
-#include <mt-plat/v1/charger_type.h>
-#endif
 #endif
 
 #include "../oplus_charger.h"
@@ -251,8 +246,6 @@ struct chip_bq25601d {
 	struct device		*dev;
 	int				hw_aicl_point;
 	int				sw_aicl_point;
-	int				bat_cv_mv;
-	bool			sub_chg_irq_disable;
 	atomic_t			charger_suspended;
 	int				irq_gpio;
 	int slave_chg_en_gpio;

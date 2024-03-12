@@ -35,14 +35,12 @@
 #include <linux/reboot.h>
 #include <linux/regmap.h>
 #include <mt-plat/upmu_common.h>
-#include "../oplus_chg_track.h"
 
 #include <mt6357-pulse-charger.h>
 #include <charger_class.h>
 #include "../oplus_charger.h"
 #include "oplus_bq2560x_reg.h"
-#include "../oplus_vooc.h"
-extern void oplus_wake_up_usbtemp_thread(void);
+
 extern int oplus_chg_get_charger_subtype(void);
 extern int oplus_chg_pd_setup(void);
 extern int oplus_chg_get_pd_type(void);
@@ -73,12 +71,10 @@ extern struct regmap *mt6357_regmap;
 
 extern void oplus_vooc_reset_fastchg_after_usbout(void);
 extern bool oplus_vooc_get_fastchg_started(void);
-extern bool oplus_voocphy_get_fastchg_commu_ing(void);
 extern void oplus_chg_set_chargerid_switch_val(int value);
 extern void oplus_chg_clear_chargerid_info(void);
 extern void oplus_chg_set_charger_type_unknown(void);
 extern bool oplus_vooc_get_fastchg_to_normal(void);
-extern bool oplus_vooc_get_fastchg_to_warm(void);
 extern int oplus_vooc_get_adapter_update_status(void);
 extern int oplus_get_usb_status(void);
 
@@ -86,8 +82,6 @@ extern int oplus_get_usb_status(void);
 extern int mt_get_chargerid_volt (void);
 extern void mt_set_chargerid_switch_val(int value);
 extern int mt_get_chargerid_switch_val(void);
-#define FG_INTR_CHARGER_IN	8
-#define FG_INTR_CHARGER_OUT	4
 #endif
 
 #define BQ_CHARGER_CURRENT_MAX_MA		3400
@@ -103,13 +97,6 @@ extern int mt_get_chargerid_switch_val(void);
 #define BQ_COLD_TEMPERATURE_DECIDEGC	0
 #define BQ_WARM_TEMPERATURE_DECIDEGC	340
 #define BQ_HOT_TEMPERATURE_DECIDEGC	370
-
-#define AICL_POINT_VOL_9V 7600
-#define AICL_POINT_VOL_5V 4140
-#define HW_AICL_POINT_VOL_5V_PHASE1 4440
-#define HW_AICL_POINT_VOL_5V_PHASE2 4520
-#define SW_AICL_POINT_VOL_5V_PHASE1 4500
-#define SW_AICL_POINT_VOL_5V_PHASE2 4535
 
 enum bq2560x_part_no {
 	BQ25600 = 0x00,
@@ -198,14 +185,10 @@ struct bq2560x {
 	bool tcpc_kpoc;
 	unsigned int chgdet_mdelay;
 #endif
-	struct pinctrl		*pinctrl;
-	struct pinctrl_state	*subchg_enable;
-	struct pinctrl_state	*subchg_disable;
 };
 
 static bool dumpreg_by_irq = 0;
 static int  current_percent = 70;
-static bool ignore_bc_detect = false;
 module_param(current_percent, int, 0644);
 module_param(dumpreg_by_irq, bool, 0644);
 
@@ -222,11 +205,6 @@ static void pmic_set_register_value(struct regmap *map,
 	regmap_update_bits(map, addr, mask << shift, val << shift);
 }
 
-
-int __attribute__((weak)) wakeup_fg_daemon(unsigned int flow_state, int cmd, int para1)
-{
-	return 0;
-}
 
 static int __bq2560x_read_reg(struct bq2560x* bq, u8 reg, u8 *data)
 {
@@ -724,9 +702,10 @@ static int hw_charging_get_charger_type(void) {
 /***************BC1.2*****************/
 
 
-static int bq2560x_get_charger_type(struct bq2560x *bq, const enum charger_type type)
+static int bq2560x_get_charger_type(struct bq2560x *bq, enum charger_type *type)
 {
-	enum charger_type chg_type = type;
+	enum charger_type chg_type = CHARGER_UNKNOWN;
+	chg_type = hw_charging_get_charger_type();
 
 	pr_notice("bq2560x_get_charger_type:%d\n", chg_type);
 	if (chg_type == CHARGER_UNKNOWN)
@@ -741,26 +720,9 @@ static int bq2560x_get_charger_type(struct bq2560x *bq, const enum charger_type 
 	if (chg_type == NONSTANDARD_CHARGER)
 		bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB_DCP;
 
+	*type = chg_type;
 	return 0;
 
-}
-
-static int bq2560x_inform_online_type(struct bq2560x *bq)
-{
-	int ret = 0;
-	union power_supply_propval propval;
-
-	if (!bq->psy) {
-		bq->psy = power_supply_get_by_name("mtk-master-charger");
-		if (IS_ERR_OR_NULL(bq->psy)) {
-			pr_notice("Couldn't get bq->psy\n");
-			return -EINVAL;
-		}
-	}
-
-	power_supply_changed(bq->psy);
-
-	return ret;
 }
 
 static int bq2560x_enable_otg(struct bq2560x *bq)
@@ -796,21 +758,6 @@ static int bq2560x_disable_charger(struct bq2560x *bq)
 	u8 val = REG01_CHG_DISABLE << REG01_CHG_CONFIG_SHIFT;
 	ret = bq2560x_update_bits(bq, BQ2560X_REG_01, REG01_CHG_CONFIG_MASK, val);
 	return ret;
-}
-
-int oplus_bq2560x_set_current(int curr)
-{
-	u8 ichg = 0;
-	if (!g_bq) {
-		return -1;
-	}
-
-	if (curr < REG02_ICHG_BASE)
-		curr = REG02_ICHG_BASE;
-
-	ichg = (curr - REG02_ICHG_BASE)/REG02_ICHG_LSB;
-	return bq2560x_update_bits(g_bq, BQ2560X_REG_02, REG02_ICHG_MASK,
-			ichg << REG02_ICHG_SHIFT);
 }
 
 int bq2560x_set_chargecurrent(struct bq2560x *bq, int curr)
@@ -1171,19 +1118,8 @@ static int bq2560x_chgdet_en(struct bq2560x *bq, bool en)
 	}
 
 	if (en) {
-		if (oplus_vooc_get_fastchg_to_normal() == false
-			&& oplus_vooc_get_fastchg_to_warm() == false) {
-			if (chip->authenticate
-				&& chip->mmi_chg
-				&& !chip->balancing_bat_stop_chg
-				&& (chip->charging_state != CHARGING_STATUS_FAIL)
-				&& oplus_vooc_get_allow_reading()
-				&& !oplus_is_rf_ftm_mode()) {
-				bq2560x_enable_charger(bq);
-			} else {
-				chg_err("should not turn on charging here! \n");
-			}
-		}
+		if((chip != NULL) && (chip->authenticate))
+			bq2560x_enable_charger(bq);
 	} else {
 		bq->pre_current_ma = -1;
 		bq->nonstand_retry_bc = false;
@@ -1218,39 +1154,6 @@ static int bq2560x_enable_chgdet(struct charger_device *chg_dev, bool en)
     return ret;
 }
 #endif
-
-static int bq2560x_charger_ic_enable_gpio(struct bq2560x *bq)
-{
-	if (!bq) {
-		chg_err("bq2560x chip not ready!\n");
-		return -EINVAL;
-	}
-
-	bq->pinctrl = devm_pinctrl_get(bq->dev);
-	if (IS_ERR(bq->pinctrl)) {
-		chg_err("--get subch_en_pinctrl fail\n");
-		return -EINVAL;
-	} else {
-		chg_err("--get subch_en_pinctrl ok\n");
-	}
-
-	bq->subchg_enable = pinctrl_lookup_state(bq->pinctrl, "subchg_enable");
-	if (IS_ERR(bq->subchg_enable)) {
-		chg_err("get subchg_enable fail\n");
-		return -EINVAL;
-	}
-
-	bq->subchg_disable = pinctrl_lookup_state(bq->pinctrl, "subchg_disable");
-	if (IS_ERR(bq->subchg_disable)) {
-		chg_err("get subchg_disable fail\n");
-		return -EINVAL;
-	}
-
-	pr_err("bq2560x charger IC gpio enabling");
-	pinctrl_select_state(bq->pinctrl, bq->subchg_enable);
-
-	return 0;
-}
 
 static struct bq2560x_platform_data* bq2560x_parse_dt(struct device_node *np,
 							struct bq2560x * bq)
@@ -1382,28 +1285,30 @@ static int bq2560x_init_device(struct bq2560x *bq)
 	return 0;
 }
 
+static void determine_initial_status(struct bq2560x *bq)
+{
+	bq2560x_get_charger_type(bq, &bq->chg_type);
+	if (bq->chg_type == STANDARD_HOST || bq->chg_type == CHARGING_HOST) {
+		if(bq->chg_type == CHARGING_HOST)
+		{
+			pr_info("usb check cdp successfully1\n");
+		}
+		pr_info("sdp cdp retry bc1\n");
+		bq2560x_get_charger_type(bq, &bq->chg_type);
+	}
+	if (bq->chg_type == NONSTANDARD_CHARGER) {
+		pr_info("nonstd retry bc\n");
+		bq2560x_get_charger_type(bq, &bq->chg_type);
+	}
+	bq2560x_inform_charger_type(bq);
+	power_supply_changed(bq->psy);
+}
+
 #ifdef CONFIG_OPLUS_CHARGER_MTK
 #define OPLUS_BC12_RETRY_NUM 2
 #else
 #define OPLUS_BC12_RETRY_NUM 1
 #endif
-static bool oplus_bq2560x_pd_without_usb(void)
-{
-#ifdef CONFIG_TCPC_CLASS
-	if (!g_oplus_chip || !g_bq || !g_bq->tcpc) {
-		chg_err("fail to init oplus_chip\n");
-		return false;
-	}
-
-	if (!tcpm_inquire_pd_connected(g_bq->tcpc))
-		return false;
-
-	return (tcpm_inquire_dpm_flags(g_bq->tcpc) & DPM_FLAGS_PARTNER_USB_COMM) ? false : true;
-#else
-	return false;
-#endif
-}
-
 static int bq2560x_bc12_detect(struct bq2560x *bq)
 {
 	int ret = 0;
@@ -1411,7 +1316,7 @@ static int bq2560x_bc12_detect(struct bq2560x *bq)
 	enum charger_type prev_chg_type;
 
 	prev_chg_type = bq->chg_type;
-	bq->chg_type = hw_charging_get_charger_type();
+	ret = bq2560x_get_charger_type(bq, &bq->chg_type);
 	while ((bc12_retry_num < OPLUS_BC12_RETRY_NUM) && (bq->chg_type == STANDARD_HOST || bq->chg_type == CHARGING_HOST)) {
 		bc12_retry_num++;
 		if(bq->chg_type == CHARGING_HOST)
@@ -1419,30 +1324,16 @@ static int bq2560x_bc12_detect(struct bq2560x *bq)
 			pr_info("usb check cdp successfully1\n");
 		}
 		pr_info("sdp cdp retry bc1, retry:[%d]\n", bc12_retry_num);
-		bq->chg_type = hw_charging_get_charger_type();
+		ret = bq2560x_get_charger_type(bq, &bq->chg_type);
 	}
 
 	if (bq->chg_type == NONSTANDARD_CHARGER) {
 		pr_info("nonstd retry bc\n");
-		bq->chg_type = hw_charging_get_charger_type();
-	} else if (bq->chg_type == STANDARD_HOST) {
-		if (oplus_bq2560x_pd_without_usb()) {
-			pr_info("pd without usb_comm,force sdp to dcp\n");
-			bq->chg_type = STANDARD_CHARGER;
-			bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB_DCP;
-		}
-	} else if (bq->chg_type == CHARGING_HOST) {
-		if (oplus_bq2560x_pd_without_usb()) {
-			pr_info("pd without usb_comm,force cdp to dcp\n");
-			bq->chg_type = STANDARD_CHARGER;
-			bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB_DCP;
-		}
+		ret = bq2560x_get_charger_type(bq, &bq->chg_type);
 	}
 
-	ret = bq2560x_get_charger_type(bq, bq->chg_type);
-	bq2560x_inform_online_type(bq);
+	power_supply_changed(bq->psy);
 
-	chg_err("[BQ2560X] prev_chg_type[%d], chg_type[%d]!!!\n", prev_chg_type, bq->chg_type);
 	return ret;
 }
 
@@ -1463,43 +1354,6 @@ static int bq2560x_detect_device(struct bq2560x* bq)
 	}
 
     return ret;
-}
-
-static void register_charger_devinfo(struct bq2560x* bq)
-{
-#ifndef CONFIG_DISABLE_OPLUS_FUNCTION
-	int ret = 0;
-	char *version;
-	char *manufacture;
-
-	if(!bq) {
-		chg_err("No bq2560x device found!\n");
-		return;
-        }
-	switch (bq->part_no) {
-	case 0x00:
-		version = "bq25600";
-		manufacture = "TI";
-		break;
-	case 0x02:
-		version = "bq25601";
-		manufacture = "TI";
-		break;
-	default:
-		version = "unknown";
-		manufacture = "UNKNOWN";
-		break;
-	}
-	if (strcmp(g_bq->chg_dev_name, "primary_chg") == 0) {
-		ret = register_device_proc("charger", version, manufacture);
-	}
-	else {
-		ret = register_device_proc("secondary_charger",version,manufacture);
-	}
-	if (ret) {
-		pr_err("register_charger_devinfo failed\n");
-        }
-#endif
 }
 
 #ifdef CONFIG_TCPC_CLASS
@@ -1917,55 +1771,6 @@ void oplus_bq2560x_dump_registers(void)
 	bq2560x_dump_regs(g_bq);
 }
 
-bool oplus_bq2560x_check_chrdet_status(void)
-{
-	bool pre_vbus_status = false;
-
-	if (g_oplus_chip == NULL) {
-		return false;
-	}
-
-	/* Keep the charger in place during fast charge communication */
-	if (oplus_voocphy_get_fastchg_commu_ing()) {
-		pre_vbus_status = true;
-		g_bq->psy_online = pre_vbus_status;
-		return pre_vbus_status;
-	}
-
-	if (g_oplus_chip && g_oplus_chip->unwakelock_chg == 1
-		&& g_oplus_chip->charger_type != POWER_SUPPLY_TYPE_UNKNOWN) {
-		g_bq->psy_online = pre_vbus_status;
-		chg_err("[BQ2560X] unwakelock_chg=1, use pre status=%d\n", pre_vbus_status);
-		return pre_vbus_status;
-	}
-
-#ifdef CONFIG_TCPC_CLASS
-	if (g_bq->tcpc) {
-		if (tcpm_inquire_typec_attach_state(g_bq->tcpc) == TYPEC_ATTACHED_SRC){
-			return false;
-		}
-	}
-#else
-	if (g_oplus_chip->otg_online == true) {
-		return false;
-	}
-#endif
-	pre_vbus_status = pmic_get_register_value(mt6357_regmap,
-		PMIC_RGS_CHRDET_ADDR,
-		PMIC_RGS_CHRDET_MASK,
-		PMIC_RGS_CHRDET_SHIFT);
-	chg_err("[BQ2560X] pre_vbus_status: %s\n", pre_vbus_status?"Pass":"Fail");
-
-	g_bq->psy_online = pre_vbus_status;
-
-	if (!pre_vbus_status && (g_bq->chg_type != CHARGER_UNKNOWN)) {
-		g_bq->chg_type = CHARGER_UNKNOWN;
-		g_bq->oplus_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
-		chg_err("[BQ2560X] clear chg_type!!!\n");
-	}
-	return pre_vbus_status;
-}
-
 #define BQ2560X_VBUS_STATUS_CHECK_MDELAY 1000
 static void bq2560x_wakeup_vbus_status_check(unsigned int delay_ms)
 {
@@ -1980,7 +1785,7 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 	int ret;
 	u8 reg_val;
 	bool prev_pg;
-	static enum charger_type prev_chg_type = CHARGER_UNKNOWN;
+	enum charger_type prev_chg_type;
 	struct oplus_chg_chip *chip = g_oplus_chip;
 	bool vbus_status = false;
 
@@ -2001,22 +1806,16 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 	}
 	oplus_bq2560x_set_mivr_by_battery_vol();
 
-	if (prev_pg == bq->power_good && bq->chg_type != CHARGER_UNKNOWN
-		&& bq->chg_type != NONSTANDARD_CHARGER) {
-		chg_err("%s prev_pg & current pg is same!\n", __func__);
-		return IRQ_HANDLED;
-	}
-
 	if (!prev_pg && bq->power_good) {
+#ifdef CONFIG_TCPC_CLASS
+		if (!bq->chg_det_enable)
+			return IRQ_HANDLED;
+#endif
 		get_monotonic_boottime(&bq->ptime[0]);
 		g_bq->psy_online = true;
-		oplus_chg_track_check_wired_charging_break(g_bq->psy_online);
 
 		bq2560x_inform_charger_type(bq);
-		bq2560x_inform_online_type(bq);
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-		wakeup_fg_daemon(FG_INTR_CHARGER_IN, 0, 0);
-#endif
+
 		pr_notice("adapter/usb inserted\n");
 	} else if (prev_pg && !bq->power_good) {
 		if (g_oplus_chip->vchg_status == CHARGER_STATUS__VOL_HIGH
@@ -2025,7 +1824,6 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 			return IRQ_HANDLED;
 		}
 		bq->psy_online = false;
-		oplus_chg_track_check_wired_charging_break(bq->psy_online);
 		bq->pre_current_ma = -1;
 		bq->chg_type = CHARGER_UNKNOWN;
 		bq->oplus_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
@@ -2036,7 +1834,7 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 			pr_notice("pd qc is false\n");
 		}
 
-		vbus_status = oplus_bq2560x_check_chrdet_status();
+		vbus_status = mt6357_get_vbus_status();
 		if (oplus_vooc_get_fastchg_started() == true
 			&& oplus_vooc_get_adapter_update_status() != 1) {
 			pr_err("oplus_vooc_get_fastchg_started = true!\n");
@@ -2053,10 +1851,6 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 			}
 		}
 		bq2560x_inform_charger_type(bq);
-		bq2560x_inform_online_type(bq);
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-		wakeup_fg_daemon(FG_INTR_CHARGER_OUT, 0, 0);
-#endif
 		Charger_Detect_Release();
 		cancel_delayed_work_sync(&bq->bq2560x_aicr_setting_work);
 		cancel_delayed_work_sync(&bq->bq2560x_current_setting_work);
@@ -2079,20 +1873,13 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 #ifdef CONFIG_CHARGER_SY6970
 	oplus_wake_up_usbtemp_thread();
 #endif
+	prev_chg_type = bq->chg_type;
 
-	if (bq->chg_type != CHARGER_UNKNOWN) {
-		chg_err("[BQ2560X] prev_chg_type[%d] , current chg_type[%d]", prev_chg_type, bq->chg_type);
-		prev_chg_type = bq->chg_type;
+	if (prev_chg_type != CHARGER_UNKNOWN) {
 		return IRQ_HANDLED;
 	}
 
-	// ALPS07072607
-	if (!ignore_bc_detect) {
-		bq2560x_bc12_detect(bq);
-	} else {
-		bq->chg_type = STANDARD_CHARGER;
-		bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB_DCP;
-	}
+	bq2560x_bc12_detect(bq);
 
 	schedule_delayed_work(&g_bq->bq2560x_aicr_setting_work, msecs_to_jiffies(200));
 
@@ -2112,10 +1899,9 @@ static irqreturn_t bq2560x_irq_handler(int irq, void *data)
 		}
 	}
 
-	prev_chg_type = bq->chg_type;
 	bq2560x_inform_charger_type(bq);
-	bq2560x_inform_online_type(bq);
 
+	power_supply_changed(bq->psy);
 	return IRQ_HANDLED;
 }
 
@@ -2187,7 +1973,6 @@ static struct charger_ops bq2560x_chg_ops = {
 /* v-haoyunlai 给otg节点赋值 */
 bool oplus_get_otg_online_status_default(void)
 {
-#ifdef CONFIG_TCPC_CLASS
 	pr_info("start\n");
 	if (!g_oplus_chip || !g_bq || !g_bq->tcpc) {
 		chg_err("fail to init oplus_chip\n");
@@ -2199,9 +1984,6 @@ bool oplus_get_otg_online_status_default(void)
 	else
 		g_oplus_chip->otg_online = false;
 	return g_oplus_chip->otg_online;
-#else
-	return g_oplus_chip->otg_online;
-#endif
 }
 
 int oplus_get_otg_online_status(void)
@@ -2231,10 +2013,10 @@ int oplus_bq2560x_set_ichg(int cur)
 
 void oplus_bq2560x_set_mivr(int vbatt)
 {
-	if(g_bq->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE1 && vbatt > AICL_POINT_VOL_5V) {
-		g_bq->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE2;
-	} else if(g_bq->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE2 && vbatt < AICL_POINT_VOL_5V) {
-		g_bq->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE1;
+	if(g_bq->hw_aicl_point == 4400 && vbatt > 4250) {
+		g_bq->hw_aicl_point = 4500;
+	} else if(g_bq->hw_aicl_point == 4500 && vbatt < 4150) {
+		g_bq->hw_aicl_point = 4400;
 	}
 
 	bq2560x_set_input_volt_limit(g_bq, g_bq->hw_aicl_point);
@@ -2289,22 +2071,9 @@ int oplus_bq2560x_set_aicr(int current_ma)
 	else
 		g_bq->pre_current_ma = current_ma;
 
-	chg_vol = mt6357_get_vbus_voltage();
-	if (chg_vol > AICL_POINT_VOL_9V) {
-		aicl_point_temp = aicl_point = AICL_POINT_VOL_9V;
-	} else {
-		if (chip->batt_volt > AICL_POINT_VOL_5V)
-			aicl_point_temp = aicl_point = SW_AICL_POINT_VOL_5V_PHASE2;
-		else
-			aicl_point_temp = aicl_point = SW_AICL_POINT_VOL_5V_PHASE1;
-	}
-	chg_err("[BQ2560X] [current_ma:%d, chg_vol:%d, batt_volt:%d ,aicl_point:%d]\n", current_ma, chg_vol, chip->batt_volt, aicl_point);
-	if (chip->stop_chg == 0 && ((g_bq->oplus_chg_type == POWER_SUPPLY_TYPE_USB || g_bq->oplus_chg_type == POWER_SUPPLY_TYPE_USB_CDP)
-		|| chip->mmi_chg == 0)) {
-		bq2560x_disable_charger(g_bq);
-		i = 0;
-		goto aicl_end;
-	}
+	pr_info("usb input max current limit=%d\n", current_ma);
+	aicl_point_temp = aicl_point = 4500;
+	//bq2560x_set_input_volt_limit(g_bq, 4200);
 
 	if (current_ma < 500) {
 		i = 0;
@@ -2467,10 +2236,7 @@ int oplus_bq2560x_set_input_current_limit(int current_ma)
 
 	}
 
-	if (g_oplus_chip != NULL && g_oplus_chip->dual_charger_support == true) {
-		cur_ma = oplus_bq2560x_input_current_limit_protection(cur_ma);
-	}
-
+	cur_ma = oplus_bq2560x_input_current_limit_protection(cur_ma);
 	get_monotonic_boottime(&g_bq->ptime[1]);
 	diff = timespec_sub(g_bq->ptime[1], g_bq->ptime[0]);
 	g_bq->aicr = cur_ma;
@@ -2526,11 +2292,6 @@ int oplus_bq2560x_hardware_init(void)
 	if (ret < 0)
 		pr_notice("en wdt fail\n");
 
-	/* Disable safety timer*/
-	ret = bq2560x_disable_safety_timer(g_bq);
-	if (ret < 0)
-		chg_err("disable safety timer fail\n");
-
 	/* Enable charging */
 	if (strcmp(g_bq->chg_dev_name, "primary_chg") == 0) {
 #ifdef CONFIG_OPLUS_CHARGER_MTK
@@ -2550,15 +2311,15 @@ int oplus_bq2560x_hardware_init(void)
                 if (ret < 0)
                         pr_notice("en chg fail\n");
 #endif
+	}
 
-		if((g_oplus_chip != NULL) && (g_oplus_chip->is_double_charger_support)) {
-			if(g_bq->oplus_chg_type != POWER_SUPPLY_TYPE_USB) {
-				g_oplus_chip->sub_chg_ops->hardware_init();
-			} else {
-				g_oplus_chip->sub_chg_ops->charging_disable();
-			}
-
+	if((g_oplus_chip != NULL) && (g_oplus_chip->is_double_charger_support)) {
+		if(g_bq->oplus_chg_type != POWER_SUPPLY_TYPE_USB) {
+			g_oplus_chip->sub_chg_ops->hardware_init();
+		} else {
+			g_oplus_chip->sub_chg_ops->charging_disable();
 		}
+
 	}
 
 	return ret;
@@ -2607,10 +2368,6 @@ int oplus_bq2560x_enable_otg(void)
 		return ret;
 	}
 
-#ifndef CONFIG_TCPC_CLASS
-	g_oplus_chip->otg_online = true;
-#endif
-
 	g_bq->otg_enable = true;
 	return ret;
 }
@@ -2625,10 +2382,6 @@ int oplus_bq2560x_disable_otg(void)
 		pr_notice("disable otg fail(%d)\n", ret);
 		return ret;
 	}
-
-#ifndef CONFIG_TCPC_CLASS
-	g_oplus_chip->otg_online = false;
-#endif
 
 	g_bq->otg_enable = false;
 	return ret;
@@ -2666,10 +2419,7 @@ int oplus_bq2560x_charger_suspend(void)
 		bq2560x_enter_hiz_mode(g_bq);
 	} else {
 		oplus_bq2560x_set_aicr(BQ2560X_SUSPEND_AICR);
-		if (oplus_vooc_get_fastchg_to_normal() == false
-			&& oplus_vooc_get_fastchg_to_warm() == false) {
-			bq2560x_disable_charger(g_bq);
-		}
+		bq2560x_disable_charger(g_bq);
 	}
 
 	return 0;
@@ -2689,39 +2439,13 @@ int oplus_bq2560x_charger_unsuspend(void)
 
 	ret = bq2560x_get_hiz_mode(g_bq, &val);
 	if ((boot_mode == META_BOOT || ((oplus_get_usb_status() & USB_TEMP_HIGH) == 0))
-			&& ((ret == 0) && (val != 0))) {
+		&& ((ret == 0) && (val != 0))) {
 		bq2560x_exit_hiz_mode(g_bq);
-	}
-
-	schedule_delayed_work(&g_bq->bq2560x_aicr_setting_work, msecs_to_jiffies(BQ2560X_UNSUSPEND_JIFFIES));
-
-	if (g_oplus_chip) {
-		if (oplus_vooc_get_fastchg_to_normal() == false
-			&& oplus_vooc_get_fastchg_to_warm() == false) {
-			if (g_oplus_chip->authenticate
-				&& g_oplus_chip->mmi_chg
-				&& !g_oplus_chip->balancing_bat_stop_chg
-				&& (g_oplus_chip->charging_state != CHARGING_STATUS_FAIL)
-				&& oplus_vooc_get_allow_reading()
-				&& !oplus_is_rf_ftm_mode()) {
-				chg_err("enable charger by update bits \n");
-				bq2560x_enable_charger(g_bq);
-			}
-		}
 	} else {
+		schedule_delayed_work(&g_bq->bq2560x_aicr_setting_work, msecs_to_jiffies(BQ2560X_UNSUSPEND_JIFFIES));
 		bq2560x_enable_charger(g_bq);
 	}
-
 	return 0;
-}
-
-void oplus_bq2560x_really_charger_suspend(bool en)
-{
-	if (en) {
-		bq2560x_enter_hiz_mode(g_bq);
-	} else {
-		bq2560x_exit_hiz_mode(g_bq);
-	}
 }
 
 int oplus_bq2560x_set_rechg_vol(int vol)
@@ -2754,7 +2478,23 @@ int oplus_bq2560x_get_chargerid_volt(void)
 	return 0;
 }
 
-
+bool oplus_bq2560x_check_chrdet_status(void)
+{
+	bool vbus;
+#ifdef CONFIG_TCPC_CLASS
+	if (g_bq->tcpc) {
+		if (tcpm_inquire_typec_attach_state(g_bq->tcpc) == TYPEC_ATTACHED_SRC){
+			return false;
+		}
+	}
+#endif
+	vbus = pmic_get_register_value(mt6357_regmap,
+		PMIC_RGS_CHRDET_ADDR,
+		PMIC_RGS_CHRDET_MASK,
+		PMIC_RGS_CHRDET_SHIFT);
+	pr_err("vbus: %s\n", vbus?"Pass":"Fail");
+	return vbus;
+}
 
 int oplus_bq2560x_get_charger_subtype(void)
 {
@@ -2769,10 +2509,10 @@ bool oplus_bq2560x_need_to_check_ibatt(void)
 int oplus_bq2560x_get_dyna_aicl_result(void)
 {
 	u8 val;
-	int ret = 0;
+	int ret;
 	int ilim = 0;
 
-	ret = bq2560x_read_byte(g_bq, &val, BQ2560X_REG_00);
+	bq2560x_read_byte(g_bq, &val, BQ2560X_REG_00);
 	if (!ret) {
 		ilim = val & REG00_IINLIM_MASK;
 		ilim = (ilim >> REG00_IINLIM_SHIFT) * REG00_IINLIM_LSB;
@@ -2784,7 +2524,7 @@ int oplus_bq2560x_get_dyna_aicl_result(void)
 
 bool oplus_bq2560x_get_shortc_hw_gpio_status(void)
 {
-	return true;
+	return false;
 }
 
 static void oplus_mt_power_off(void)
@@ -2795,7 +2535,7 @@ static void oplus_mt_power_off(void)
 	}
 
 	if (g_oplus_chip->ac_online != true) {
-		if(!oplus_bq2560x_check_chrdet_status())
+		if(!mt6357_get_vbus_status())
 			kernel_power_off();
 	} else {
 		printk(KERN_ERR "[OPLUS_CHG][%s]: ac_online is true, return!\n", __func__);
@@ -2839,36 +2579,18 @@ static int oplus_bq2560x_set_rtc_spare_oplus_fg_value(int soc)
 
 static void bq2560x_init_work_handler(struct work_struct *work)
 {
-	int ret;
-	u8 reg_val;
-	if (oplus_bq2560x_check_chrdet_status()) {
+	if (mt6357_get_vbus_status()) {
 		pr_notice("USB is inserted!\n");
-
-		ret = bq2560x_read_byte(g_bq, &reg_val, BQ2560X_REG_08);
-		if (ret) {
-			pr_err("read BQ2560X_REG_08 error!\n");
-			return;
-		}
-
 		if (g_bq->otg_enable) {
 			pr_err("otg enable exit!\n");
 			return;
 		}
-
-		g_bq->power_good = !!(reg_val & REG08_PG_STAT_MASK);
-
 		mutex_lock(&g_bq->chgdet_en_lock);
 		g_bq->psy_online = true;
 		bq2560x_chgdet_en(g_bq, false);
 		bq2560x_chgdet_en(g_bq, true);
 
-		if (g_bq->chg_type == CHARGER_UNKNOWN) {
-			bq2560x_bc12_detect(g_bq);
-			bq2560x_inform_charger_type(g_bq);
-		}
-#ifdef CONFIG_OPLUS_CHARGER_MTK
-		wakeup_fg_daemon(FG_INTR_CHARGER_IN, 0, 0);
-#endif
+		determine_initial_status(g_bq);
 		mutex_unlock(&g_bq->chgdet_en_lock);
 	}
 }
@@ -2887,7 +2609,6 @@ struct oplus_chg_operations  oplus_chg_bq2560x_ops = {
 	.get_charging_enable = oplus_bq2560x_is_charging_enabled,
 	.charger_suspend = oplus_bq2560x_charger_suspend,
 	.charger_unsuspend = oplus_bq2560x_charger_unsuspend,
-	.really_suspend_charger = oplus_bq2560x_really_charger_suspend,
 	.set_rechg_vol = oplus_bq2560x_set_rechg_vol,
 	.reset_charger = oplus_bq2560x_reset_charger,
 	.read_full = oplus_bq2560x_is_charging_done,
@@ -2943,7 +2664,7 @@ static void aicr_setting_work_callback(struct work_struct *work)
 
 static void bq2560x_check_vbus_status_work_callback(struct work_struct *work)
 {
-	bool vbus_status = oplus_bq2560x_check_chrdet_status();
+	bool vbus_status = mt6357_get_vbus_status();
 	pr_info("Start\n");
 
 	if (!vbus_status) {
@@ -2954,8 +2675,6 @@ static void bq2560x_check_vbus_status_work_callback(struct work_struct *work)
 		}
 		oplus_chg_set_charger_type_unknown();
 	}
-	if (g_bq)
-		bq2560x_inform_online_type(g_bq);
 }
 
 static void charging_current_setting_work(struct work_struct *work)
@@ -3051,13 +2770,11 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 		    noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
 			pr_info("USB Plug in, pol = %d\n", noti->typec_state.polarity);
 			pr_info("call switch_usb_state = 1 \n");
-			ignore_bc_detect = false;
-			if (oplus_vooc_get_fastchg_to_normal() ||
-				oplus_vooc_get_fastchg_to_warm()) {
-				chg_err("oplus_vooc_get_fastchg_to_normal or warm, not enable charger.\n");
-			} else {
+			if (!oplus_vooc_get_fastchg_to_normal()) {
 				bq->chgdet_mdelay = 450;
 				handle_typec_attach(bq, true);
+			} else {
+				pr_info("oplus_vooc_get_fastchg_to_normal, not enable charger.\n");
 			}
 		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SNK ||
 			noti->typec_state.old_state == TYPEC_ATTACHED_SRC ||
@@ -3076,20 +2793,17 @@ static int pd_tcp_notifier_call(struct notifier_block *nb,
 			pr_info("call switch_usb_state = 0 \n");
 			//switch_usb_state(0);
 			bq->chgdet_mdelay = 0;
-			ignore_bc_detect = false;
 			handle_typec_attach(bq, false);
 		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
 			pr_info("Source_to_Sink\n");
 			bq->chgdet_mdelay = 0;
 			handle_typec_attach(bq, true);
-			ignore_bc_detect = true;
 		}  else if (noti->typec_state.old_state == TYPEC_ATTACHED_SNK &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
 			pr_info("Sink_to_Source\n");
                      bq->chgdet_mdelay = 0;
 			handle_typec_attach(bq, false);
-			ignore_bc_detect = true;
 		}
 		break;
 	default:
@@ -3105,7 +2819,7 @@ static int bq2560x_charger_get_online(struct bq2560x *bq,
 	bool pwr_rdy = false;
 
 	mutex_lock(&bq->attach_lock);
-	pwr_rdy = bq->psy_online;
+	pwr_rdy = bq->typec_attach;
 	mutex_unlock(&bq->attach_lock);
 
 	pr_info("online = %d\n", pwr_rdy);
@@ -3256,11 +2970,6 @@ static int bq2560x_charger_probe(struct i2c_client *client,
 #endif
 	mutex_init(&bq->chgdet_en_lock);
 
-	// Initialize gpio to enable sub charger IC bq2560x
-	ret = bq2560x_charger_ic_enable_gpio(bq);
-	if (ret < 0)
-		pr_err("BQ2560X charger ic gpio enabled failed, ret:%d", ret);
-
 	ret = bq2560x_detect_device(bq);
 	if(ret) {
 		pr_err("No bq2560x device found!\n");
@@ -3288,7 +2997,6 @@ static int bq2560x_charger_probe(struct i2c_client *client,
 
 	bq->oplus_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
 	bq->pre_current_ma = -1;
-	register_charger_devinfo(bq);
 
 #ifndef CONFIG_TCPC_CLASS
 	if (strcmp(bq->chg_dev_name, "primary_chg") == 0) {
@@ -3411,7 +3119,6 @@ static int bq2560x_charger_remove(struct i2c_client *client)
 
 static void bq2560x_charger_shutdown(struct i2c_client *client)
 {
-	oplus_bq2560x_disable_otg();
 }
 
 static struct of_device_id bq2560x_charger_match_table[] = {

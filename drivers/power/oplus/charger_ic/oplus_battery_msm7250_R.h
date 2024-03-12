@@ -530,7 +530,6 @@ struct smb_charger {
 	struct delayed_work hvdcp_disable_work;
 	struct delayed_work regist_pd;
 	int qc_abnormal_check_count;
-	int real_chg_type;
 #endif
 
 #ifdef OPLUS_FEATURE_CHG_BASIC
@@ -689,7 +688,6 @@ struct smb_charger {
 #endif
 	struct delayed_work	ccdetect_work;
 	bool		usbtemp_parameter;
-	bool		usbtemp_parameter_20813;
 #endif
 
 #ifdef OPLUS_FEATURE_CHG_BASIC

@@ -35,7 +35,7 @@
 #define _BQ25890H_
 #include "oplus_bq2589x_reg.h"
 #include <linux/time.h>
-#include <soc/oplus/oplus_project.h>
+#include <soc/oppo/oppo_project.h>
 
 extern void set_charger_ic(int sel);
 extern unsigned int is_project(int project);
@@ -56,8 +56,6 @@ extern unsigned int is_project(int project);
 #define BQ_WARM_TEMPERATURE_DECIDEGC	340
 #define BQ_HOT_TEMPERATURE_DECIDEGC	370
 #define BQ_HOT_TEMP_TO_5V	420
-
-#define BQ2589X_DEVICE_CONFIGURATION 3
 
 enum {
 	PN_BQ25890H,
@@ -982,13 +980,24 @@ static int bq2589x_get_charger_type(struct bq2589x *bq, enum charger_type *type)
 	vbus_stat = (reg_val & BQ2589X_VBUS_STAT_MASK);
 	vbus_stat >>= BQ2589X_VBUS_STAT_SHIFT;
 	bq->vbus_type = vbus_stat;
-	pr_err("bq2589x_get_charger_type:%d,reg0B = 0x%x,part_no = %d\n", vbus_stat, reg_val, bq->part_no);
+	pr_err("bq2589x_get_charger_type:%d,reg0B = 0x%x\n",vbus_stat,reg_val);
 	switch (vbus_stat) {
 	case BQ2589X_VBUS_TYPE_NONE:
 		chg_type = CHARGER_UNKNOWN;
+	if (bq->power_good && (bq->is_bq2589x == false)) {
+		chg_type = STANDARD_CHARGER;
+		bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB_DCP;
+	}else {
+		chg_type = CHARGER_UNKNOWN;
 		bq->oplus_chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
+	}
 		break;
 	case BQ2589X_VBUS_TYPE_SDP:
+		if ((g_oplus_chip != NULL) && (bq->power_good) && !(bq->is_bq2589x)) {
+			g_oplus_chip->charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
+			pr_err("%s restore chip charger type\n", __func__);
+		}
+
 		chg_type = STANDARD_HOST;
 		bq->oplus_chg_type = POWER_SUPPLY_TYPE_USB;
 		break;
@@ -1022,7 +1031,7 @@ static int bq2589x_get_charger_type(struct bq2589x *bq, enum charger_type *type)
 	}
 
 	*type = chg_type;
-	pr_err("%s oplus_chg_type = %d\n", __func__, bq->oplus_chg_type);
+
 	return 0;
 }
 
@@ -1037,10 +1046,10 @@ static int bq2589x_inform_charger_type(struct bq2589x *bq)
 			return -ENODEV;
 	}
 
-	if (bq->chg_type == CHARGER_UNKNOWN || !bq->power_good)
-		propval.intval = 0;
-	else
+	if (bq->chg_type != CHARGER_UNKNOWN)
 		propval.intval = 1;
+	else
+		propval.intval = 0;
 
 	ret = power_supply_set_property(bq->psy, POWER_SUPPLY_PROP_ONLINE,
 					&propval);
@@ -1127,10 +1136,8 @@ static irqreturn_t bq2589x_irq_handler(int irq, void *data)
 
 	prev_chg_type = bq->chg_type;
 	ret = bq2589x_get_charger_type(bq, &bq->chg_type);
-
 	//bq2589x_inform_charger_type(bq);
 	if (!ret && prev_chg_type != bq->chg_type && bq->chg_det_enable) {
-		bq2589x_inform_charger_type(bq);
 		if ((NONSTANDARD_CHARGER == bq->chg_type) && (!bq->nonstand_retry_bc)) {
 			bq->nonstand_retry_bc = true;
 			if (is_project(0x216AF) || is_project(0x216B0) || is_project(0x216B1)){
@@ -1156,6 +1163,7 @@ static irqreturn_t bq2589x_irq_handler(int irq, void *data)
 			cancel_delayed_work_sync(&bq->bq2589x_current_setting_work);
 		}
 
+		bq2589x_inform_charger_type(bq);
 	//	bq2589x_set_input_current_limit(bq, 1400);
 	//	g_oplus_chip->sub_chg_ops->input_current_write(600);
 		if (bq->is_bq2589x) {
@@ -1261,7 +1269,7 @@ static int bq2589x_detect_device(struct bq2589x *bq)
 		bq->revision =
 		    (data & BQ2589X_DEV_REV_MASK) >> BQ2589X_DEV_REV_SHIFT;
 	}
-	if (bq->part_no == BQ2589X_DEVICE_CONFIGURATION) {
+	if (bq->part_no == 0b011) {
 		bq->is_bq2589x = true;
 	} else {
 		bq->is_bq2589x = false;

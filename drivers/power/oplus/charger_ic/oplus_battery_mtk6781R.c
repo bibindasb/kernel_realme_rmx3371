@@ -1760,6 +1760,9 @@ aicl_rerun:
 	return rc;
 }
 
+#ifdef CONFIG_OPLUS_CHARGER_MTK6781
+#define DELTA_MV        32
+#endif
 static int oplus_mt6370_float_voltage_write(int vfloat_mv)
 {
 	int rc = 0;
@@ -1778,7 +1781,7 @@ static int oplus_mt6370_float_voltage_write(int vfloat_mv)
 			chg_debug("set float voltage:%d fail\n", vfloat_mv);
 		}
 
-		rc = bq25601d_float_voltage_write(vfloat_mv);
+		rc = bq25601d_float_voltage_write(vfloat_mv + DELTA_MV);
 		if (rc < 0) {
 			chg_debug("set sub float voltage:%d fail\n", vfloat_mv);
 		}
@@ -3078,42 +3081,12 @@ static int oplus_chg_parse_custom_dt(struct oplus_chg_chip *chip)
 /************************************************/
 /* Power Supply Functions
 *************************************************/
-extern void oplus_vooc_reset_fastchg_after_usbout(void);
-extern void oplus_chg_clear_chargerid_info(void);
-extern void oplus_chg_set_chargerid_switch_val(int);
-extern void oplus_chg_set_charger_type_unknown(void);
-
 static int mt_ac_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
 {
 	int rc = 0;
-	int charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
 
-	charger_type = mt_get_charger_type();
-
-	switch (psp) {
-	case POWER_SUPPLY_PROP_ONLINE:
-		val->intval = 0;
-
-		/* Force to 1 in all charger type */
-		if (charger_type != CHARGER_UNKNOWN)
-			val->intval = 1;
-
-		/* Reset to 0 if charger type is USB */
-		if ((charger_type == STANDARD_HOST) ||
-			(charger_type == CHARGING_HOST))
-			val->intval = 0;
-
-		if (val->intval == 0) {
-			oplus_vooc_reset_fastchg_after_usbout();
-			oplus_chg_set_chargerid_switch_val(0);
-			oplus_chg_clear_chargerid_info();
-			oplus_chg_set_charger_type_unknown();
-		}
-		break;
-	default:
-		rc = oplus_ac_get_property(psy, psp, val);
-	}
+	rc = oplus_ac_get_property(psy, psp, val);
 	return rc;
 }
 
@@ -3134,18 +3107,8 @@ static int mt_usb_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
 {
 	int rc = 0;
-	int charger_type = POWER_SUPPLY_TYPE_UNKNOWN;
-
-	charger_type = mt_get_charger_type();
 
 	switch (psp) {
-	case POWER_SUPPLY_PROP_ONLINE:
-		if ((charger_type == STANDARD_HOST) ||
-			(charger_type == CHARGING_HOST))
-			val->intval = 1;
-		else
-			val->intval = 0;
-		break;
 	default:
 		rc = oplus_usb_get_property(psy, psp, val);
 	}
@@ -3360,9 +3323,6 @@ EXPORT_SYMBOL(oplus_chg_get_mmi_status);
 static int oplus_mt6370_get_pd_type(void)
 {
 	if (pinfo != NULL) {
-		if (oplus_chg_check_pd_disable())
-			return PD_INACTIVE;
-
 		if (pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK ||
 			pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
 			pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO)
@@ -3459,12 +3419,8 @@ int oplus_chg_get_charger_subtype(void)
 
 	if (pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK ||
 		pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_PD30 ||
-		pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO) {
-			if (oplus_chg_check_pd_disable())
-				return CHARGER_SUBTYPE_DEFAULT;
-			else
-				return CHARGER_SUBTYPE_PD;
-		}
+		pinfo->pd_type == MTK_PD_CONNECT_PE_READY_SNK_APDO)
+		return CHARGER_SUBTYPE_PD;
 
 	if (mt6370_get_hvdcp_type() == POWER_SUPPLY_TYPE_USB_HVDCP)
 		return CHARGER_SUBTYPE_QC;
@@ -3767,10 +3723,8 @@ void oplus_chg_set_camera_on(bool val)
 					oplus_mt6370_pd_setup();
 				}
 			}
-		} else if (oplus_chg_get_voocphy_support() == AP_SINGLE_CP_VOOCPHY) {
-			oplus_chg_set_flash_led_status(g_oplus_chip->camera_on);
 		}
-	}
+        }
 }
 EXPORT_SYMBOL(oplus_chg_set_camera_on);
 #endif
@@ -4122,5 +4076,6 @@ static void __exit mtk_charger_exit(void)
 module_exit(mtk_charger_exit);
 
 
+MODULE_AUTHOR("LiYue<liyue1@oplus.com>");
 MODULE_DESCRIPTION("OPLUS Charger Driver");
 MODULE_LICENSE("GPL");

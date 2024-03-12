@@ -64,7 +64,6 @@ extern void oplus_wake_up_usbtemp_thread(void);
 extern int qpnp_get_prop_charger_voltage_now(void);
 extern int qpnp_get_prop_ibus_now(void);
 
-extern struct oplus_chg_chip *g_oplus_chip;
 
 struct chip_sgm41511 {
 	struct device		*dev;
@@ -93,7 +92,6 @@ struct chip_sgm41511 {
 	int			before_suspend_icl;
 	int			before_unsuspend_icl;
 	struct delayed_work	bc12_retry_work;
-	int		set_ovp_value;
 };
 
 static struct chip_sgm41511 *charger_ic = NULL;
@@ -101,10 +99,6 @@ static int aicl_result = 500;
 #define OPLUS_BC12_RETRY_CNT 1
 #define OPLUS_BC12_DELAY_CNT 18
 
-#define SGM41511_OVP_5500MV		5500
-#define SGM41511_OVP_6500MV		6500
-#define SGM41511_OVP_10500MV	10500
-#define SGM41511_OVP_14000MV	14000
 
 static int sgm41511_request_dpdm(struct chip_sgm41511 *chip, bool enable);
 static void sgm41511_get_bc12(struct chip_sgm41511 *chip);
@@ -285,14 +279,12 @@ int sgm41511_chg_get_dyna_aicl_result(void)
 	return aicl_result;
 }
 
-#define AICL_POINT_VOL_5V_HIGH		4300
-#define AICL_POINT_VOL_5V_LOW		4140
-#define HW_AICL_POINT_VOL_5V_PHASE1	4400
-#define HW_AICL_POINT_VOL_5V_PHASE2	4500
-#define HW_AICL_POINT_VOL_5V_PHASE3	4600
-#define HW_AICL_POINT_VOL_5V_CHECK	4250
-#define SW_AICL_POINT_VOL_5V_PHASE1	4500
-#define SW_AICL_POINT_VOL_5V_PHASE2	4535
+#define AICL_POINT_VOL_5V_PHASE1 4140
+#define AICL_POINT_VOL_5V_PHASE2 4000
+#define HW_AICL_POINT_VOL_5V_PHASE1 4440
+#define HW_AICL_POINT_VOL_5V_PHASE2 4520
+#define SW_AICL_POINT_VOL_5V_PHASE1 4500
+#define SW_AICL_POINT_VOL_5V_PHASE2 4535
 void sgm41511_set_aicl_point(int vbatt)
 {
 	struct chip_sgm41511 *chip = charger_ic;
@@ -300,27 +292,15 @@ void sgm41511_set_aicl_point(int vbatt)
 	if (!chip)
 		return;
 
-	if (vbatt > AICL_POINT_VOL_5V_HIGH) {
-		if (chip->hw_aicl_point != HW_AICL_POINT_VOL_5V_PHASE3) {
-			chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE3;
-			chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE2;
-		}
-	} else if (vbatt > AICL_POINT_VOL_5V_LOW) {
-		if (chip->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE3 && vbatt < HW_AICL_POINT_VOL_5V_CHECK) {
-			chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE2;
-			chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE2;
-		} else if (chip->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE1) {
-			chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE2;
-			chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE2;
-		}
-	} else {
-		if (chip->hw_aicl_point != HW_AICL_POINT_VOL_5V_PHASE1) {
-			chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE1;
-			chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE1;
-		}
+	if (chip->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE1 && vbatt > AICL_POINT_VOL_5V_PHASE1) {
+		chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE2;
+		chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE2;
+		sgm41511_set_vindpm_vol(chip->hw_aicl_point);
+	} else if(chip->hw_aicl_point == HW_AICL_POINT_VOL_5V_PHASE2 && vbatt < AICL_POINT_VOL_5V_PHASE2) {
+		chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE1;
+		chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE1;
+		sgm41511_set_vindpm_vol(chip->hw_aicl_point);
 	}
-
-	sgm41511_set_vindpm_vol(chip->hw_aicl_point);
 }
 
 int sgm41511_get_charger_vol(void)
@@ -333,10 +313,6 @@ int sgm41511_get_vbus_voltage(void)
 	return qpnp_get_prop_charger_voltage_now();
 }
 
-int sgm41511_get_ibus_current(void)
-{
-	return qpnp_get_prop_ibus_now();
-}
 #define AICL_DOWN_DELAY_MS	50
 #define AICL_DELAY_MIN_US	90000
 #define AICL_DELAY_MAX_US	91000
@@ -1052,6 +1028,15 @@ int sgm41511_check_charging_enable(void)
 	return charging_enable;
 }
 
+int sgm41511_get_ibus_current(void)
+{
+	if (sgm41511_check_charging_enable()) {
+		return qpnp_get_prop_ibus_now();
+	} else {
+		return 0;
+	}
+}
+
 int sgm41511_suspend_charger(void)
 {
 	struct chip_sgm41511 *chip = charger_ic;
@@ -1315,23 +1300,6 @@ int sgm41511_set_ovp(int val)
 	return rc;
 }
 
-int oplus_sgm41511_set_ovp_value(int val)
-{
-	int rc = 0;
-
-	if(val == SGM41511_OVP_14000MV) {
-		rc = sgm41511_set_ovp(REG06_SGM41511_OVP_14P0V);
-	} else if (val == SGM41511_OVP_10500MV) {
-		rc = sgm41511_set_ovp(REG06_SGM41511_OVP_10P5V);
-	} else if (val == SGM41511_OVP_5500MV) {
-		rc = sgm41511_set_ovp(REG06_SGM41511_OVP_5P5V);
-	} else {
-		rc = sgm41511_set_ovp(REG06_SGM41511_OVP_6P5V);
-	}
-
-	return rc;
-}
-
 int sgm41511_get_vbus_stat(void)
 {
 	int rc = 0;
@@ -1473,12 +1441,6 @@ void sgm41511_vooc_timeout_callback(bool vbus_rising)
 int sgm41511_hardware_init(void)
 {
 	struct chip_sgm41511 *chip = charger_ic;
-	struct oplus_chg_chip *ochip = g_oplus_chip;
-	int vbatt = 0;
-
-	if (ochip) {
-		vbatt = ochip->batt_volt;
-	}
 
 	chg_err("init sgm41511 hardware! \n");
 
@@ -1487,13 +1449,7 @@ int sgm41511_hardware_init(void)
         }
 
 	/*must be before set_vindpm_vol and set_input_current*/
-	if (vbatt > AICL_POINT_VOL_5V_HIGH) {
-		chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE3;
-	} else if (vbatt > AICL_POINT_VOL_5V_LOW) {
-		chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE2;
-	} else {
-		chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE1;
-	}
+	chip->hw_aicl_point = HW_AICL_POINT_VOL_5V_PHASE1;
 	chip->sw_aicl_point = SW_AICL_POINT_VOL_5V_PHASE1;
 
 
@@ -1515,6 +1471,7 @@ int sgm41511_hardware_init(void)
 
 	sgm41511_set_prechg_current(WPC_PRECHARGE_CURRENT);
 
+	sgm41511_set_ovp(REG06_SGM41511_OVP_10P5V);
 
 	sgm41511_set_termchg_current(WPC_TERMINATION_CURRENT);
 
@@ -1523,9 +1480,7 @@ int sgm41511_hardware_init(void)
 	sgm41511_set_vindpm_vol(chip->hw_aicl_point);
 
 	sgm41511_set_otg_voltage();
-
-	oplus_sgm41511_set_ovp_value(chip->set_ovp_value);
-
+	
 	sgm41511_set_wdt_timer(REG05_SGM41511_WATCHDOG_TIMER_40S);
 
 	return true;
@@ -1625,12 +1580,6 @@ static int sgm41511_parse_dt(struct chip_sgm41511 *chip)
                 chg_err("gpio_is_valid fail enable-gpio[%d]\n", chip->irq_gpio);
         } else {
 		chg_err("enable-gpio[%d]\n", chip->enable_gpio);
-	}
-
-	ret = of_property_read_u32(chip->client->dev.of_node, "qcom,set_sgm41511_ovp", &chip->set_ovp_value);
-	if(ret) {
-		chip->set_ovp_value = SGM41511_OVP_6500MV;
-		chg_err("Failed to read node of qcom,set_sgm41511_ovp\n");
 	}
 
 	return ret;
@@ -1973,10 +1922,11 @@ static int sgm41511_charger_probe(struct i2c_client *client,
 		goto err_create_file;
 	}
 
-	ret = sgm41511_irq_register(chip);
+	sgm41511_irq_register(chip);
 	if (ret) {
 		chg_err("Failed to register irq ret=%d\n", ret);
 	}
+
 	set_charger_ic(SGM41511);
 	chg_err("SGM41511 probe success.");
 

@@ -3501,7 +3501,7 @@ void charger_debug_init(void)
 {
 	struct proc_dir_entry *charger_dir;
 
-	charger_dir = proc_mkdir("mtk_charger", NULL);
+	charger_dir = proc_mkdir("charger", NULL);
 	if (!charger_dir) {
 		chr_err("fail to mkdir /proc/charger\n");
 		return;
@@ -4423,5 +4423,6 @@ static void __exit mtk_charger_exit(void)
 module_exit(mtk_charger_exit);
 
 
+MODULE_AUTHOR("wy.chuang <wy.chuang@mediatek.com>");
 MODULE_DESCRIPTION("MTK Charger Driver");
 MODULE_LICENSE("GPL");
