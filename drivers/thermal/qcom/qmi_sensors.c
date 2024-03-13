@@ -267,12 +267,6 @@ static int qmi_ts_request(struct qmi_sensor *qmi_sens,
 
 	memset(&req, 0, sizeof(req));
 	memset(&resp, 0, sizeof(resp));
-#ifdef CONFIG_ESOC_MDM_4x
-	if (modem_force_rst) {
-		i = 0;
-		j = 0;
-	}
-#endif
 	strlcpy(req.sensor_id.sensor_id, qmi_sens->qmi_name,
 		QMI_TS_SENSOR_ID_LENGTH_MAX_V01);
 	req.seq_num = 0;
