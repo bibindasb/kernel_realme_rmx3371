@@ -14,6 +14,12 @@
 #define TIMED_OUTPUT
 #endif
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 1)
+#define KERNEL_VERSION_414
+#endif
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 9, 1)
+#define KERNEL_VERSION_49
+#endif
 /*********************************************************
  *
  * aw8697.h
@@ -94,8 +100,19 @@
 #define AW8697_0815_HAPTIC_CONT_TD               0x009a
 #define AW8697_0815_HAPTIC_CONT_ZC_THR           0x0ff1
 #define AW8697_0815_HAPTIC_CONT_NUM_BRK          3
+
+#define AW8697_081538_HAPTIC_F0_PRE                1500    /* 150Hz */
+#define AW8697_081538_HAPTIC_F0_CALI_PERCEN        7       /* -7%~7% */
+#define AW8697_081538_HAPTIC_CONT_DRV_LVL          118     /* 118*6.1/256=2.81v */
+#define AW8697_081538_HAPTIC_CONT_DRV_LVL_OV       118     /* NA */
+#define AW8697_081538_HAPTIC_CONT_TD               0x009a
+#define AW8697_081538_HAPTIC_CONT_ZC_THR           0x0ff1
+#define AW8697_081538_HAPTIC_CONT_NUM_BRK          3
 #endif
 
+#define DEV_ID_0619		619
+#define DEV_ID_0832		832
+#define DEV_ID_1040             1040
 #define AW8697_HAPTIC_F0_COEFF              260     //2.604167
 
 
@@ -375,6 +392,7 @@ struct aw8697 {
 
     struct mutex lock;
     struct mutex rtp_lock;
+	struct mutex qos_lock;
     struct hrtimer timer;
     struct work_struct vibrator_work;
     struct work_struct rtp_work;
@@ -392,7 +410,11 @@ struct aw8697 {
     bool audio_ready;
     int pre_haptic_number;
     bool rtp_on;
+#ifdef KERNEL_VERSION_49
     struct timeval start,end;
+#else
+	ktime_t kstart, kend;
+#endif
     unsigned int timeval_flags;
     unsigned int osc_cali_flag;
     unsigned long int microsecond;
@@ -480,7 +502,6 @@ struct aw8697 {
 #ifdef OPLUS_FEATURE_CHG_BASIC
     struct work_struct  motor_old_test_work;
     unsigned int motor_old_test_mode;
-    atomic_t qos_cnt;
 #endif
 #ifdef CONFIG_OPLUS_HAPTIC_OOS
 	int boot_mode;
@@ -520,6 +541,8 @@ struct aw8697_que_seq {
 #ifdef OPLUS_FEATURE_CHG_BASIC
 #define F0_VAL_MAX_0815                     1800
 #define F0_VAL_MIN_0815                     1600
+#define F0_VAL_MAX_081538                   1600
+#define F0_VAL_MIN_081538                   1400
 #define F0_VAL_MAX_0832                     2350
 #define F0_VAL_MIN_0832                     2250
 #define F0_VAL_MAX_0833                     2380
@@ -566,11 +589,13 @@ struct aw8697_que_seq {
 #endif
 #define NEW_RING_START          120
 #define NEW_RING_END            160
+#define OS12_NEW_RING_START     70
+#define OS12_NEW_RING_END       89
 #define REALME_RING_START       161
 #define REALME_RING_END         167
 
 #define OPLUS_START_INDEX       201
-#define OPLUS_END_INDEX         320
+#define OPLUS_END_INDEX         326
 #define OPLUS_RING_START_INDEX  152
 #define OPLUS_RING_END_INDEX    231
 
