@@ -1,5 +1,5 @@
 /******************************************************************************
-** Copyright (C), 2019-2029, OPPO Mobile Comm Corp., Ltd
+** Copyright (C), 2019-2029, OPLUS Mobile Comm Corp., Ltd
 ** VENDOR_EDIT, All rights reserved.
 ** File: - wlan_oplus_wfd.c
 ** Description: wlan oplus wfd
@@ -64,7 +64,7 @@ static void remove_he_ie_from_probe_request(int remove) {
     debug("set remove he ie =%d", remove);
 }
 
-static struct wireless_dev * get_wdev_sta(void)
+static struct wireless_dev * get_wdev_sta()
 {
     struct wireless_dev *wdev = NULL;
 

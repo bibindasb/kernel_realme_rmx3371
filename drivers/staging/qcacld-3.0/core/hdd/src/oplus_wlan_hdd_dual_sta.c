@@ -1,11 +1,11 @@
 /**************************************************************
-* Copyright (c) 2019 - 2022 OPPO Mobile Comm Corp., Ltd.
+* Copyright (c) 2019 - 2022 OPLUS Mobile Comm Corp., Ltd.
 * *
-* File : oppo_wlan_hdd_dual_sta.cpp
+* File : oplus_wlan_hdd_dual_sta.cpp
 * Description: create proc file to show if current router is 1x1 IOT router
 * Version : 1.0
 * Date : 2019-9-12
-* Author : zhaomengqing@oppo.com
+* Author : zhaomengqing
 * ---------------- Revision History: --------------------------
 * <version> <date> < author > <desc>
 *
@@ -32,7 +32,7 @@ int is1x1IOTRouter = 0;
 char routerBssid[32] = {0};
 
 /**
- * hdd_driver_oppo_read() - perform read operation in proc file
+ * hdd_driver_oplus_read() - perform read operation in proc file
  * memory dump proc file
  * @file  - handle for the proc file.
  * @buf   - pointer to user space buffer.
@@ -68,7 +68,7 @@ static ssize_t hdd_driver_oplus_read(struct file *file, char __user *buf,
 }
 
 /**
- * struct oppo_dual_sta_fops - file operations
+ * struct oplus_dual_sta_fops - file operations
  * @read - read function for proc file is1x1IOTRouter.
  *
  * This structure initialize the file operation handle
@@ -78,7 +78,7 @@ static const struct file_operations oplus_dual_sta_fops = {
 };
 
 /**
- * hdd_driver_oppo_procfs_init() - Initialize procfs
+ * hdd_driver_oplus_procfs_init() - Initialize procfs
  *
  * This function create file under proc file system to be used later for
  * getting if current router is a 1x1 IOT Router
@@ -110,7 +110,7 @@ static int hdd_driver_oplus_procfs_init(void)
 }
 
 /**
- * hdd_driver_oppo_procfs_remove() - Remove file/dir under procfs
+ * hdd_driver_oplus_procfs_remove() - Remove file/dir under procfs
  *
  * This function removes file/dir under proc file system
  *
@@ -126,7 +126,7 @@ static void hdd_driver_oplus_procfs_remove(void)
 }
 
 /**
- * hdd_driver_oppo_init() - Intialization function for driver
+ * hdd_driver_oplus_init() - Intialization function for driver
  *
  * This function creates proc file
  *
@@ -146,7 +146,7 @@ int hdd_driver_oplus_init(void)
 }
 
 /**
- * hdd_driver_oppo_deinit() - De initialize driver
+ * hdd_driver_oplus_deinit() - De initialize driver
  *
  * This function removes proc file.
  *

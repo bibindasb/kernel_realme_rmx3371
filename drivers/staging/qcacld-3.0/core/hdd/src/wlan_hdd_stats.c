@@ -440,10 +440,7 @@ static bool put_wifi_interface_info(struct wifi_interface_info *stats,
 		    CFG_COUNTRY_CODE_LEN, stats->apCountryStr) ||
 	    nla_put(vendor_event,
 		    QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_COUNTRY_STR,
-		    CFG_COUNTRY_CODE_LEN, stats->countryStr) ||
-	    nla_put_u32(vendor_event,
-			QCA_WLAN_VENDOR_ATTR_LL_STATS_IFACE_INFO_TS_DUTY_CYCLE,
-			stats->time_slice_duty_cycle)) {
+		    CFG_COUNTRY_CODE_LEN, stats->countryStr)) {
 		hdd_err("QCA_WLAN_VENDOR_ATTR put fail");
 		return false;
 	}
@@ -4748,6 +4745,7 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 	int link_speed_rssi_mid = 0;
 	int link_speed_rssi_low = 0;
 	uint32_t link_speed_rssi_report = 0;
+	int8_t rssi_offset;
 
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_CFG80211_GET_STA,
@@ -4799,6 +4797,12 @@ static int wlan_hdd_get_sta_stats(struct wiphy *wiphy,
 		adapter->rssi = 0;
 		adapter->hdd_stats.summary_stat.rssi = 0;
 	}
+	/* Adjust RSSI of connected AP per customer's requirement */
+	rssi_offset = wma_get_rssi_offset(adapter->vdev_id);
+	adapter->rssi += rssi_offset;
+	snr += rssi_offset;
+	hdd_debug("vdev %d, adjust rssi offset: %d, snr: %d, rssi: %d",
+		adapter->vdev_id, rssi_offset, snr, adapter->rssi);
 
 	sinfo->signal = adapter->rssi;
 	hdd_debug("snr: %d, rssi: %d",
@@ -5605,9 +5609,7 @@ QDF_STATUS wlan_hdd_get_mib_stats(struct hdd_adapter *adapter)
 		return ret;
 	}
 
-#ifdef WLAN_DEBUGFS
 	hdd_debugfs_process_mib_stats(adapter, stats);
-#endif
 
 	wlan_cfg80211_mc_cp_stats_free_stats_event(stats);
 	return ret;
